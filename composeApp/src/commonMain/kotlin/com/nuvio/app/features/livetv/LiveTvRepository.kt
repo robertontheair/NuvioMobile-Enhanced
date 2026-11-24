@@ -34,6 +34,7 @@ object LiveTvRepository {
     private var refreshJob: Job? = null
     private var restoredEpg: LiveTvCachedEpg? = null
     private var epgJob: Job? = null
+    @kotlin.concurrent.Volatile private var householdLineupLoaded = false // Total Eclipse
     private var detectedEpgUrls: List<String> = emptyList()
     private val epgGuideCache = mutableMapOf<String, LiveTvCachedEpgGuide>()
 
@@ -331,6 +332,9 @@ object LiveTvRepository {
         refreshJob = scope.launch {
             val loadedChannels = mutableListOf<LiveTvChannel>()
             val failedPlaylistNames = mutableListOf<String>()
+            // Total Eclipse: as on the Apple TVs, a direct Xtream / Stalker login is the backup for
+            // the NAS (epgfix) lineup, not a second copy of it: used only when that lineup fails.
+            householdLineupLoaded = false
             val playlistEpgUrls = mutableListOf<String>()
 
             val playlistResults = enabledPlaylists.map { playlist ->
@@ -341,6 +345,8 @@ object LiveTvRepository {
                             LiveTvPlaylistType.LocalFile -> playlist.source
                         }
                         withContext(Dispatchers.Default) {
+                            // Total Eclipse: an epgfix (NAS) lineup carries hometv-* labels.
+                            if (payload.contains("hometv-kind=")) householdLineupLoaded = true
                             parseM3uEpgUrls(payload) to parseM3uPlaylist(payload, playlist)
                         }
                     }
@@ -372,7 +378,7 @@ object LiveTvRepository {
             }
 
             xtreamResult?.await()?.fold(
-                onSuccess = { loadedChannels += it },
+                onSuccess = { if (!householdLineupLoaded) loadedChannels += it },
                 onFailure = { error ->
                     if (error is CancellationException) throw error
                     failedPlaylistNames += "Xtream"
@@ -380,7 +386,7 @@ object LiveTvRepository {
                 },
             )
             stalkerResult?.await()?.fold(
-                onSuccess = { loadedChannels += it },
+                onSuccess = { if (!householdLineupLoaded) loadedChannels += it },
                 onFailure = { error ->
                     if (error is CancellationException) throw error
                     failedPlaylistNames += "Stalker Portal"
