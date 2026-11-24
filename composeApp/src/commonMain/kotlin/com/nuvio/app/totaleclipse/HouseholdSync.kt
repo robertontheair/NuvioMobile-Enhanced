@@ -59,6 +59,7 @@ internal object HouseholdSync {
     // Phone-only bookkeeping.
     private const val LOCAL_PROFILE_MAP = "totaleclipse.household.profileMap"
     private const val LOCAL_APPLIED_PREFIX = "totaleclipse.household.applied."
+    private const val LOCAL_REMOTE_PREFIX = "totaleclipse.livetv.remote."
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val mutex = Mutex()
@@ -113,6 +114,7 @@ internal object HouseholdSync {
     }
 
     private suspend fun syncNow(reason: String) {
+        upgradeHomePlaylists()
         val keys = HouseholdCloudStore.keys()
         if (keys.none { it.startsWith(TV_PROFILE_SETTINGS_PREFIX) }) {
             InAppLogger.info(TAG, "$reason: no household data in iCloud (${keys.size} keys)")
@@ -201,7 +203,7 @@ internal object HouseholdSync {
                 })
             }
         }
-        val liveTv = liveTvImport(tvId)
+        val liveTv = liveTvImport(tvId)?.let { remoteLiveTv(it) }
         val import = if (liveTv == null) baseImport else JsonObject(baseImport + ("live_tv" to liveTv))
         val sections = import.keys.sorted().joinToString(",")
         if (import.isNotEmpty() && changedSinceLastApply("settings.$slot", import.toString())) {
@@ -274,6 +276,112 @@ internal object HouseholdSync {
                 })
             }
         }
+    }
+
+    /**
+     * The TVs use epgfix on the home network (http://192.168.x.x:8787). On the phone, switch to
+     * its remote link (Cloudflare Tunnel + secret path) so Live TV also works away from home:
+     * epgfix names that link in an X-TotalEclipse-Remote header, which a HEAD request on the home
+     * network reads. The link is remembered on the phone; with none known, the home link stays.
+     */
+    private suspend fun remoteLiveTv(import: JsonObject): JsonObject {
+        val playlists = import["playlists"] as? kotlinx.serialization.json.JsonArray ?: return import
+        var originMap = emptyMap<String, String>()   // LAN origin → remote base
+        val mapped = buildJsonArray {
+            playlists.forEach { element ->
+                val item = element as? JsonObject
+                val source = (item?.get("source") as? kotlinx.serialization.json.JsonPrimitive)?.content
+                val remote = source?.takeIf(::isHomeNetworkUrl)?.let { remotePlaylistFor(it) }
+                if (item == null || source == null || remote == null) {
+                    element.let(::add)
+                } else {
+                    originMap = originMap + (origin(source) to remote.removeSuffix("/playlist.m3u"))
+                    add(JsonObject(item + ("source" to kotlinx.serialization.json.JsonPrimitive(remote))))
+                    // Drop the home-network copy if it was added before the remote link was known.
+                    com.nuvio.app.features.livetv.LiveTvRepository.uiState.value.playlists
+                        .filter { it.source.trim().equals(source.trim(), ignoreCase = true) }
+                        .forEach { com.nuvio.app.features.livetv.LiveTvRepository.removePlaylist(it.id) }
+                }
+            }
+        }
+        val guides = (import["epg_sources"] as? kotlinx.serialization.json.JsonArray)?.let { array ->
+            buildJsonArray {
+                array.forEach { element ->
+                    val item = element as? JsonObject
+                    val url = (item?.get("url") as? kotlinx.serialization.json.JsonPrimitive)?.content
+                    val base = url?.let { originMap[origin(it)] }
+                    if (item == null || url == null || base == null) add(element)
+                    else add(JsonObject(item + ("url" to kotlinx.serialization.json.JsonPrimitive(base + url.removePrefix(origin(url))))))
+                }
+            }
+        }
+        return JsonObject(import + ("playlists" to mapped) + (guides?.let { mapOf("epg_sources" to it) } ?: emptyMap()))
+    }
+
+    /**
+     * Any Live TV playlist on the phone that points at the home network (added by hand, or before
+     * the remote link was known) is swapped for its away-from-home link once that's known.
+     */
+    private suspend fun upgradeHomePlaylists() {
+        val repo = com.nuvio.app.features.livetv.LiveTvRepository
+        repo.ensureLoaded()
+        repo.uiState.value.playlists
+            .filter { it.type == com.nuvio.app.features.livetv.LiveTvPlaylistType.Url && isHomeNetworkUrl(it.source) }
+            .forEach { playlist ->
+                val remote = remotePlaylistFor(playlist.source) ?: return@forEach
+                // Remove first: adding starts a load, and one that still included the home
+                // playlist could finish last and leave both lineups on screen.
+                repo.removePlaylist(playlist.id)
+                if (repo.uiState.value.playlists.none { it.source.equals(remote, ignoreCase = true) }) {
+                    repo.addPlaylistUrl(playlist.name, remote)
+                }
+                // Its home-network guide too: the remote playlist names its own guide.
+                val homeOrigin = origin(playlist.source)
+                repo.uiState.value.epgSources
+                    .filter { origin(it.url).equals(homeOrigin, ignoreCase = true) }
+                    .forEach { repo.removeEpgSource(it.id) }
+                InAppLogger.info(TAG, "Live TV: switched a home playlist to its away-from-home link")
+            }
+        // Home-network guides left from an earlier switch.
+        repo.uiState.value.epgSources
+            .filter { isHomeNetworkUrl(it.url) && repo.uiState.value.playlists.none { p -> isHomeNetworkUrl(p.source) } }
+            .filter { HouseholdCloudStore.loadLocal(LOCAL_REMOTE_PREFIX + fingerprint(origin(it.url) + "/playlist.m3u")) != null }
+            .forEach { repo.removeEpgSource(it.id) }
+    }
+
+    private suspend fun remotePlaylistFor(homeUrl: String): String? {
+        val key = LOCAL_REMOTE_PREFIX + fingerprint(homeUrl)
+        val learned = withTimeoutOrNull(4_000) {
+            runCatching {
+                com.nuvio.app.features.addons.httpRequestRaw(method = "HEAD", url = homeUrl, headers = emptyMap(), body = "")
+                    .headers.entries.firstOrNull { it.key.equals("X-TotalEclipse-Remote", ignoreCase = true) }?.value
+            }.getOrNull()
+        }?.trim()?.takeIf { it.startsWith("https://") && it.endsWith("/playlist.m3u") }
+        if (learned != null) {
+            if (HouseholdCloudStore.loadLocal(key) != learned) {
+                HouseholdCloudStore.saveLocal(key, learned)
+                InAppLogger.info(TAG, "Live TV: learned the away-from-home link for a home playlist")
+            }
+            return learned
+        }
+        return HouseholdCloudStore.loadLocal(key)
+    }
+
+    private fun origin(url: String): String {
+        val schemeEnd = url.indexOf("://")
+        if (schemeEnd < 0) return url
+        val pathStart = url.indexOf('/', schemeEnd + 3)
+        return if (pathStart < 0) url else url.substring(0, pathStart)
+    }
+
+    private fun isHomeNetworkUrl(url: String): Boolean {
+        val host = origin(url).substringAfter("://").substringBefore(':').lowercase()
+        if (host == "localhost" || host.endsWith(".local") || host.startsWith("192.168.") || host.startsWith("10.")) return true
+        if (host.startsWith("172.")) {
+            val second = host.split('.').getOrNull(1)?.toIntOrNull() ?: return false
+            return second in 16..31
+        }
+        return false
     }
 
     private fun changedSinceLastApply(name: String, value: String): Boolean =

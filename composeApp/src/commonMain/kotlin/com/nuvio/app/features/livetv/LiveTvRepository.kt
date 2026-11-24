@@ -693,6 +693,8 @@ internal fun parseM3uPlaylist(
     payload: String,
     playlist: LiveTvPlaylist? = null,
 ): List<LiveTvChannel> {
+    val channelIdentityCounts = mutableMapOf<String, Int>() // Total Eclipse
+    val totalEclipseLabels = mutableMapOf<String, Map<String, String>>() // Total Eclipse
     val channels = mutableListOf<LiveTvChannel>()
     var pendingInfo: M3uInfo? = null
     val pendingHeaders = LinkedHashMap<String, String>()
@@ -728,8 +730,15 @@ internal fun parseM3uPlaylist(
                     val info = pendingInfo
                     val name = info?.name?.takeIf(String::isNotBlank)
                         ?: streamUrl.substringAfterLast('/').substringBefore('?').ifBlank { "Channel" }
+                    // Total Eclipse: an id that survives playlist reorders and the switch between the
+                    // home and away-from-home link (epgfix /play/<key> keeps its last segment), so
+                    // favourites and recents stick. HomeTV keys channels by name the same way.
+                    val identity = "$name|${info?.group.orEmpty()}|" +
+                        streamUrl.substringBefore('?').trimEnd('/').substringAfterLast('/')
+                    val occurrence = (channelIdentityCounts[identity] ?: 0) + 1
+                    channelIdentityCounts[identity] = occurrence
                     channels += LiveTvChannel(
-                        id = stableChannelId(streamUrl, channels.size),
+                        id = "ch:${identity.hashCode().toUInt().toString(16)}" + if (occurrence > 1) ":$occurrence" else "",
                         name = name,
                         streamUrl = streamUrl,
                         logoUrl = info?.logoUrl?.takeIf(String::isNotBlank),
@@ -741,6 +750,7 @@ internal fun parseM3uPlaylist(
                         streamType = pendingStreamType,
                         epgId = info?.epgId?.takeIf(String::isNotBlank),
                     )
+                    info?.labels?.takeIf { it.isNotEmpty() }?.let { totalEclipseLabels[channels.last().id] = it }
                     pendingInfo = null
                     pendingHeaders.clear()
                     pendingStreamType = null
@@ -748,7 +758,11 @@ internal fun parseM3uPlaylist(
             }
         }
 
-    return channels.distinctBy { it.streamUrl }
+    // Total Eclipse: HomeTV's categories for an epgfix lineup.
+    return com.nuvio.app.totaleclipse.TotalEclipseLiveGroups.regroup(
+        channels.distinctBy { it.streamUrl },
+        totalEclipseLabels,
+    )
 }
 
 private data class M3uInfo(
@@ -757,7 +771,11 @@ private data class M3uInfo(
     val group: String?,
     val epgId: String? = null,
     val headers: Map<String, String> = emptyMap(),
+    // Total Eclipse: epgfix's hometv-kind / -category / -region / -lang labels.
+    val labels: Map<String, String> = emptyMap(),
 )
+
+private val totalEclipseLabelNames = listOf("hometv-kind", "hometv-category", "hometv-region", "hometv-lang")
 
 private fun parseExtInf(line: String): M3uInfo {
     val name = line.substring(extInfNameDelimiterIndex(line) + 1)
@@ -781,6 +799,7 @@ private fun parseExtInf(line: String): M3uInfo {
         group = readM3uAttribute(line, "group-title"),
         epgId = readM3uAttribute(line, "tvg-id"),
         headers = headers,
+        labels = totalEclipseLabelNames.mapNotNull { n -> readM3uAttribute(line, n)?.let { n to it } }.toMap(),
     )
 }
 

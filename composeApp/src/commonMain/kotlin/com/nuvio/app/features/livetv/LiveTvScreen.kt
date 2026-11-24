@@ -1625,7 +1625,8 @@ private fun buildLiveTvCategoryFilterOptions(
                 category.equals(favoritesLabel, ignoreCase = true) ||
                 category.equals(uncategorizedLabel, ignoreCase = true)
         }
-        .sortedBy { it.lowercase() }
+        // Total Eclipse: HomeTV's category order first (types, locals, international), then A–Z.
+        .sortedWith(compareBy({ com.nuvio.app.totaleclipse.TotalEclipseLiveGroups.rank(it) }, { it.lowercase() }))
 
     return buildList {
         add(LiveTvCategoryFilterOption(allChannelsLabel, LiveTvChannelFilterMode.All))
