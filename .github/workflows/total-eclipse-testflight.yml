@@ -1,6 +1,6 @@
 # Total Eclipse: build the iOS app and upload it to TestFlight.
 #
-# Runs on every push to main (a newer push cancels a build in progress) and on demand.
+# Runs on demand or for a testflight-* tag; a newer run cancels one in progress.
 # The archive is ad-hoc signed (entitlements embedded, no certificate); the export re-signs it
 # with cloud-managed certificates through an App Store Connect API key, so no certificate or
 # provisioning profile is stored in the repo or its secrets.
@@ -13,10 +13,12 @@
 #   TMDB_API_KEY      optional
 name: Total Eclipse TestFlight
 
+# Batched releases (Rob, 2026-11-24): a build takes about an hour on a hosted runner, so pushes to
+# main don't build. Start one by hand (Actions → Run workflow, or `gh workflow run`) or push a
+# tag named testflight-<anything>.
 on:
   push:
-    branches: [main]
-    paths-ignore: ['**.md', 'docs/**', 'Docs/**']
+    tags: ['testflight-*']
   workflow_dispatch:
 
 concurrency:
