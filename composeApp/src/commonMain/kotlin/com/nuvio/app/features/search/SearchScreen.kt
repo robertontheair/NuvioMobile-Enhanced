@@ -412,6 +412,11 @@ fun SearchScreen(
                             }
                         }
 
+                        // Total Eclipse: Live TV matched, so there's no "no results / failed" card
+                        // (the metadata add-on answers a channel-only search with an error).
+                        uiState.sections.isEmpty() && onLiveTvChannelClick != null &&
+                            com.nuvio.app.totaleclipse.totalEclipseLiveSearchHasMatches(normalizedQuery) -> Unit
+
                         uiState.sections.isEmpty() -> {
                             item {
                                 SearchEmptyStateCard(
