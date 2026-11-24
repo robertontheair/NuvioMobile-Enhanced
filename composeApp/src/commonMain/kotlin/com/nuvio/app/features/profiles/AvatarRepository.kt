@@ -161,6 +161,12 @@ object AvatarRepository {
     }
 
     private suspend fun fetchStandardCatalog() {
+        // Total Eclipse: no Nuvio service is configured (the placeholder is https://localhost),
+        // so don't call it; every launch logged a failed request.
+        if (!com.nuvio.app.core.network.isPublicServerHost(
+                com.nuvio.app.core.network.ServerConfigurationRepository.active.value.backendUrl,
+            )
+        ) return
         if (standardFetchInFlight) return
         standardFetchInFlight = true
         try {

@@ -220,7 +220,17 @@ internal object TraktScrobbleRepository : TrackingScrobbler {
         )
     }
 
+    // Total Eclipse: finish the request even if the app has just gone to the background.
     private suspend fun sendScrobble(
+        profileId: Int,
+        action: String,
+        item: TraktScrobbleItem,
+        progressPercent: Float,
+    ) = com.nuvio.app.totaleclipse.withBackgroundTime("Trakt scrobble") {
+        sendScrobbleNow(profileId, action, item, progressPercent)
+    }
+
+    private suspend fun sendScrobbleNow(
         profileId: Int,
         action: String,
         item: TraktScrobbleItem,
