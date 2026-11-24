@@ -91,6 +91,13 @@ private fun HomeCatalogRowSectionContent(
         key = { item -> item.stableKey() },
         state = rowState,
     ) { item ->
+        // Total Eclipse: the TVs' poster badges (COMING <date>, Top 10 numbers).
+        val rank = if (section.key.startsWith(com.nuvio.app.totaleclipse.TotalEclipsePosterBadges.TOP10_PREFIX)) {
+            entries.indexOf(item).takeIf { it in 0..9 }?.plus(1)
+        } else {
+            null
+        }
+        com.nuvio.app.totaleclipse.TotalEclipsePosterBadgeBox(item = item, rank = rank) {
         HomePosterCard(
             item = item,
             useLandscapeBackdropMode = posterCardStyle.catalogLandscapeModeEnabled,
@@ -102,5 +109,6 @@ private fun HomeCatalogRowSectionContent(
             onClick = onPosterClick?.let { { it(item) } },
             onLongClick = onPosterLongClick?.let { { it(item) } },
         )
+        }
     }
 }
