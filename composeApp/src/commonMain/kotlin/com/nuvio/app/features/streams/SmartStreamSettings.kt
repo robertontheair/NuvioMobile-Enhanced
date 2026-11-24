@@ -45,13 +45,14 @@ internal data class SmartStreamFilters(
 }
 
 internal data class SmartStreamSettings(
-    val sortMode: SmartSortMode = SmartSortMode.BEST_MATCH,
+    // Total Eclipse: AIOStreams already ranks streams the way Rob set it up, so keep its order.
+    val sortMode: SmartSortMode = SmartSortMode.ADDON_ORDER,
     val rememberChoices: Boolean = true,
     val filters: SmartStreamFilters = SmartStreamFilters(),
     val resolutionLimit: SmartResolutionLimit = SmartResolutionLimit.AUTO,
     val mobileData: SmartMobileData = SmartMobileData.SAVE_DATA,
     val autoPlay: Boolean = false,
-    val smartSorting: Boolean = true,
+    val smartSorting: Boolean = false,   // Total Eclipse: off, as on the Apple TVs
 )
 
 internal expect object SmartStreamSettingsStorage {
@@ -73,12 +74,12 @@ internal object SmartStreamSettingsRepository {
     fun onStreamsScreenClosed() {
         val current = _state.value
         if (current.rememberChoices) return
-        update { it.copy(sortMode = SmartSortMode.BEST_MATCH, filters = SmartStreamFilters()) }
+        update { it.copy(sortMode = SmartSortMode.ADDON_ORDER, filters = SmartStreamFilters()) }
     }
 
     internal fun encode(settings: SmartStreamSettings): String {
         val keepChoices = settings.rememberChoices
-        val sort = if (keepChoices) settings.sortMode else SmartSortMode.BEST_MATCH
+        val sort = if (keepChoices) settings.sortMode else SmartSortMode.ADDON_ORDER
         val f = if (keepChoices) settings.filters else SmartStreamFilters()
         return listOf(
             "sort=${sort.name}",
@@ -105,12 +106,12 @@ internal object SmartStreamSettingsRepository {
             if (index <= 0) null else part.substring(0, index) to part.substring(index + 1)
         }.toMap()
         return SmartStreamSettings(
-            sortMode = enumOr(map["sort"], SmartSortMode.BEST_MATCH),
+            sortMode = enumOr(map["sort"], SmartSortMode.ADDON_ORDER),
             rememberChoices = map["remember"] != "0",
             resolutionLimit = enumOr(map["limit"], SmartResolutionLimit.AUTO),
             mobileData = enumOr(map["mobile"], SmartMobileData.SAVE_DATA),
             autoPlay = map["auto"] == "1",
-            smartSorting = map["smartsort"] != "0",
+            smartSorting = map["smartsort"] == "1",
             filters = SmartStreamFilters(
                 resolutions = enumSet<SmartResolution>(map["res"]),
                 hdr = enumSet<SmartHdrFilter>(map["hdr"]),

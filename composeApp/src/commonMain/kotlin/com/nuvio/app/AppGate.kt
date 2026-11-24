@@ -464,6 +464,10 @@ internal fun AppGate(
             is AuthState.Unauthenticated -> {
                 if (allowCachedProfileAccess) {
                     enterProfileGate(cachedProfiles, syncOnEnter = false)
+                } else if (com.nuvio.app.totaleclipse.TotalEclipse.SKIP_NUVIO_SIGN_IN) {
+                    // Total Eclipse: no Nuvio account, like the Apple TVs: go straight to a local
+                    // (anonymous) account instead of showing the sign-in screen.
+                    AuthRepository.signInAnonymously()
                 } else {
                     ProfileRepository.clearInMemory()
                     profileSelectionLoading = false

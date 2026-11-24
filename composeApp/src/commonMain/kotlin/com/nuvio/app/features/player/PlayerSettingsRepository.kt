@@ -105,7 +105,8 @@ data class PlayerSettingsUiState(
     val playbackBackBufferSeconds: Int = 10,
     val playbackTargetBufferMb: Int = 256,
     val vodDiskCacheSizeMb: Int = 2048,
-    val streamAutoPlayMode: StreamAutoPlayMode = StreamAutoPlayMode.MANUAL,
+    // Total Eclipse: play the top stream straight away, like the Apple TVs (HomeTV stream defaults).
+    val streamAutoPlayMode: StreamAutoPlayMode = StreamAutoPlayMode.FIRST_STREAM,
     val streamAutoPlaySource: StreamAutoPlaySource = StreamAutoPlaySource.ALL_SOURCES,
     val streamAutoPlaySelectedAddons: Set<String> = emptySet(),
     val streamAutoPlaySelectedPlugins: Set<String> = emptySet(),
@@ -243,7 +244,7 @@ object PlayerSettingsRepository {
     private var playbackBackBufferSeconds = 10
     private var playbackTargetBufferMb = 256
     private var vodDiskCacheSizeMb = 2048
-    private var streamAutoPlayMode = StreamAutoPlayMode.MANUAL
+    private var streamAutoPlayMode = StreamAutoPlayMode.FIRST_STREAM
     private var streamAutoPlaySource = StreamAutoPlaySource.ALL_SOURCES
     private var streamAutoPlaySelectedAddons: Set<String> = emptySet()
     private var streamAutoPlaySelectedPlugins: Set<String> = emptySet()
@@ -367,7 +368,7 @@ object PlayerSettingsRepository {
         playbackBackBufferSeconds = 10
         playbackTargetBufferMb = 256
         vodDiskCacheSizeMb = 2048
-        streamAutoPlayMode = StreamAutoPlayMode.MANUAL
+        streamAutoPlayMode = StreamAutoPlayMode.FIRST_STREAM
         streamAutoPlaySource = StreamAutoPlaySource.ALL_SOURCES
         streamAutoPlaySelectedAddons = emptySet()
         streamAutoPlaySelectedPlugins = emptySet()
@@ -533,7 +534,7 @@ object PlayerSettingsRepository {
         vodDiskCacheSizeMb = PlayerSettingsStorage.loadVodDiskCacheSizeMb() ?: 2048
         streamAutoPlayMode = PlayerSettingsStorage.loadStreamAutoPlayMode()
             ?.let { runCatching { StreamAutoPlayMode.valueOf(it) }.getOrNull() }
-            ?: StreamAutoPlayMode.MANUAL
+            ?: StreamAutoPlayMode.FIRST_STREAM
         streamAutoPlaySource = PlayerSettingsStorage.loadStreamAutoPlaySource()
             ?.let { runCatching { StreamAutoPlaySource.valueOf(it) }.getOrNull() }
             ?: StreamAutoPlaySource.ALL_SOURCES

@@ -73,8 +73,14 @@ object PartyRepository {
 
     private val _enabled = MutableStateFlow(true)
     val available: StateFlow<Boolean> = combine(ServerConfigurationRepository.active, _enabled) { server, enabled ->
-        server.capabilities.watchParty && enabled
-    }.stateIn(scope, SharingStarted.Eagerly, ServerConfigurationRepository.active.value.capabilities.watchParty)
+        // Total Eclipse: Watch Party is off, as on the Apple TVs (TotalEclipse.WATCH_PARTY_ENABLED).
+        com.nuvio.app.totaleclipse.TotalEclipse.WATCH_PARTY_ENABLED && server.capabilities.watchParty && enabled
+    }.stateIn(
+        scope,
+        SharingStarted.Eagerly,
+        com.nuvio.app.totaleclipse.TotalEclipse.WATCH_PARTY_ENABLED &&
+            ServerConfigurationRepository.active.value.capabilities.watchParty,
+    )
 
     private var channel: PartyChannel? = null
     private var sessionScope: CoroutineScope? = null
