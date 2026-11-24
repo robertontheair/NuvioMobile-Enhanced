@@ -115,8 +115,13 @@ object StreamsRepository {
         )
         val autoPlayMode = playerSettings.streamAutoPlayMode
         val smartSettings = SmartStreamSettingsRepository.state.value
-        val smartAutoPlay = !manualSelection && smartSettings.autoPlay
-        val smartDevice = if (smartAutoPlay) currentSmartDeviceProfile() else null
+        // Total Eclipse: AIOStreams' order on Wi-Fi (as on the Apple TVs), but on cellular the smart
+        // ranking picks, so "Save mobile data" (≤1080p, a few Mbps) applies instead of a 4K remux.
+        val deviceNow = if (!manualSelection) currentSmartDeviceProfile() else null
+        val cellularSavesData = com.nuvio.app.totaleclipse.TotalEclipse.CELLULAR_USES_SMART_AUTOPLAY &&
+            deviceNow?.onWifi == false
+        val smartAutoPlay = !manualSelection && (smartSettings.autoPlay || cellularSavesData)
+        val smartDevice = if (smartAutoPlay) deviceNow else null
         val isAutoPlayEnabled = smartAutoPlay || (
             !manualSelection && autoPlayMode != StreamAutoPlayMode.MANUAL &&
                 !(autoPlayMode == StreamAutoPlayMode.REGEX_MATCH &&

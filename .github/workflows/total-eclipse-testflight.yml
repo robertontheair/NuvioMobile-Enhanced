@@ -1,8 +1,9 @@
 # Total Eclipse: build the iOS app and upload it to TestFlight.
 #
 # Runs on every push to main (a newer push cancels a build in progress) and on demand.
-# Signing uses an App Store Connect API key with cloud-managed certificates, so no
-# certificate or provisioning profile is stored in the repo or its secrets.
+# The archive is ad-hoc signed (entitlements embedded, no certificate); the export re-signs it
+# with cloud-managed certificates through an App Store Connect API key, so no certificate or
+# provisioning profile is stored in the repo or its secrets.
 #
 # Repository secrets (Settings → Secrets and variables → Actions):
 #   ASC_KEY_ID        App Store Connect API key ID
@@ -97,6 +98,9 @@ jobs:
             echo "org.gradle.parallel=false"
             echo "org.gradle.workers.max=1"
             echo "kotlin.native.disableCompilerDaemon=true"
+            # As upstream's release build: these optimizer passes are the slowest on a hosted
+            # runner (the first run ran out of time without this).
+            echo "nuvio.ios.releaseDisablePhases=DevirtualizationAnalysis,Devirtualization,RemoveRedundantCallsToStaticInitializersPhase"
           } >> ~/.gradle/gradle.properties
 
       - name: Set the version and build number
@@ -122,6 +126,19 @@ jobs:
             -archivePath "$RUNNER_TEMP/TotalEclipse.xcarchive" \
             -derivedDataPath build/ios-derived-release \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=
+
+      # An unsigned app carries no entitlements, and the export keeps the ones the archived app
+      # has. So ad-hoc sign it (no certificate needed) with its entitlements, like the shared
+      # iCloud store it reads the Apple TVs' settings from; the export re-signs it properly.
+      - name: Embed the entitlements in the archived app
+        run: |
+          app=$(find "$RUNNER_TEMP/TotalEclipse.xcarchive/Products/Applications" -maxdepth 1 -name '*.app' | head -1)
+          sed 's/$(TeamIdentifierPrefix)/B2Z256T95E./' iosApp/iosApp/iosApp.entitlements > "$RUNNER_TEMP/app.entitlements"
+          codesign --force --deep --sign - --timestamp=none --entitlements "$RUNNER_TEMP/app.entitlements" "$app"
+          if ! codesign -d --entitlements :- "$app" 2>/dev/null | grep -q "B2Z256T95E.org.radiorob.hometv"; then
+            echo "::error::The archived app has no iCloud key-value store entitlement"
+            exit 1
+          fi
 
       - name: Sign and upload to TestFlight
         env:
