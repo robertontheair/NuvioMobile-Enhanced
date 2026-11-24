@@ -32,7 +32,8 @@ import kotlinx.serialization.json.put
  * From the TVs' iCloud key-value store (see [HouseholdCloudStore]) it takes:
  * - the profiles (the TVs' primary profile "guest" becomes slot 1; others get the next free
  *   slot, remembered on this phone so a slot never changes);
- * - for the active profile: add-on links in the TVs' order, the TMDB and MDBList keys, and the
+ * - for the active profile: add-on links in the TVs' order, the TMDB and MDBList keys, the
+ *   Live TV sources (playlists, guide links, Xtream/Stalker logins) and the
  *   collections (Movies / Shows).
  *
  * Applied through the app's own settings import and collection import. Something is applied
@@ -47,6 +48,7 @@ internal object HouseholdSync {
     private const val TV_PROFILE_SETTINGS_PREFIX = "nuvio.icloud.profile.settings."
     private const val TV_GLOBAL_SETTINGS_KEY = "nuvio.icloud.global.settings"
     private const val TV_COLLECTIONS_PREFIX = "hometv.icloud.collections."
+    private const val TV_IPTV_PREFIX = "hometv.icloud.iptv."
     private const val TV_PRIMARY_PROFILE_ID = "guest"
 
     // TV setting names (HomeTV SettingsKey).
@@ -68,6 +70,18 @@ internal object HouseholdSync {
         val id: String,
         val name: String,
         val usesPrimaryAddons: Boolean? = null,
+    )
+
+    /** A TV Live TV source (HomeTV `IPTVSource`); kind is m3u, xtream or stalker. */
+    @Serializable
+    private data class TvIptvSource(
+        val name: String = "",
+        val playlistURL: String = "",
+        val kind: String = "m3u",
+        val username: String? = null,
+        val password: String? = null,
+        val mac: String? = null,
+        val guideURL: String? = null,
     )
 
     /** Call once there's a signed-in (local) account. Safe to call repeatedly. */
@@ -166,7 +180,7 @@ internal object HouseholdSync {
         val settings = HouseholdCloudStore.stringSettings(TV_GLOBAL_SETTINGS_KEY) +
             HouseholdCloudStore.stringSettings(TV_PROFILE_SETTINGS_PREFIX + tvId)
 
-        val import = buildJsonObject {
+        val baseImport = buildJsonObject {
             settings[TV_ADDON_URLS]?.lineSequence()?.map(String::trim)?.filter(String::isNotEmpty)?.toList()
                 ?.takeIf { it.isNotEmpty() }
                 ?.let { urls ->
@@ -187,6 +201,8 @@ internal object HouseholdSync {
                 })
             }
         }
+        val liveTv = liveTvImport(tvId)
+        val import = if (liveTv == null) baseImport else JsonObject(baseImport + ("live_tv" to liveTv))
         val sections = import.keys.sorted().joinToString(",")
         if (import.isNotEmpty() && changedSinceLastApply("settings.$slot", import.toString())) {
             val failures = SettingsConfigTransfer.importHousehold(import)
@@ -202,6 +218,60 @@ internal object HouseholdSync {
                         InAppLogger.info(TAG, "$reason: profile $slot ← TV '$tvId' collections (${it.size})")
                     }
                     .onFailure { InAppLogger.warn(TAG, "TV collections didn't import: ${it::class.simpleName}") }
+            }
+        }
+    }
+
+    /**
+     * The TVs' Live TV sources for this profile in the settings-import shape: M3U links as
+     * playlists, their guide links as EPG sources, and an Xtream or Stalker login. The TVs fall
+     * back to the primary profile's sources when a profile has none, so this does too.
+     */
+    private fun liveTvImport(tvId: String): JsonObject? {
+        fun read(id: String): List<TvIptvSource> =
+            HouseholdCloudStore.text(TV_IPTV_PREFIX + id)
+                ?.let { runCatching { json.decodeFromString<List<TvIptvSource>>(it) }.getOrNull() }
+                .orEmpty()
+        val sources = read(tvId).ifEmpty { if (tvId != TV_PRIMARY_PROFILE_ID) read(TV_PRIMARY_PROFILE_ID) else emptyList() }
+            .filter { it.playlistURL.isNotBlank() }
+        if (sources.isEmpty()) return null
+        val m3u = sources.filter { it.kind == "m3u" }
+        val xtream = sources.firstOrNull { it.kind == "xtream" && !it.username.isNullOrBlank() && !it.password.isNullOrBlank() }
+        val stalker = sources.firstOrNull { it.kind == "stalker" && !it.mac.isNullOrBlank() }
+        val guides = sources.mapNotNull { s -> s.guideURL?.trim()?.takeIf(String::isNotEmpty)?.let { s.name to it } }
+            .distinctBy { it.second }
+        return buildJsonObject {
+            if (m3u.isNotEmpty()) put("playlists", buildJsonArray {
+                m3u.forEach { s ->
+                    add(buildJsonObject {
+                        put("source", s.playlistURL.trim())
+                        put("type", "Url")
+                        put("name", s.name)
+                        put("enabled", true)
+                    })
+                }
+            })
+            if (guides.isNotEmpty()) put("epg_sources", buildJsonArray {
+                guides.forEach { (name, url) ->
+                    add(buildJsonObject { put("name", name); put("url", url); put("enabled", true) })
+                }
+            })
+            xtream?.let { s ->
+                put("xtream", buildJsonObject {
+                    put("server_url", s.playlistURL.trim())
+                    put("username", s.username.orEmpty())
+                    put("password", s.password.orEmpty())
+                    put("enabled", true)
+                })
+            }
+            stalker?.let { s ->
+                put("stalker", buildJsonObject {
+                    put("portal_url", s.playlistURL.trim())
+                    put("mac_address", s.mac.orEmpty())
+                    put("username", s.username.orEmpty())
+                    put("password", s.password.orEmpty())
+                    put("enabled", true)
+                })
             }
         }
     }
