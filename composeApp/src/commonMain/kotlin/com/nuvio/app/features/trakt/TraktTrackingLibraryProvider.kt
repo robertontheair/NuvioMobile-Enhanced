@@ -106,5 +106,6 @@ private fun TraktListTab.toTrackingLibraryTab(): TrackingLibraryTab =
         kind = when (type) {
             TraktListType.WATCHLIST -> TrackingLibraryTabKind.WATCHLIST
             TraktListType.PERSONAL -> TrackingLibraryTabKind.PERSONAL
+            TraktListType.FAVORITES -> TrackingLibraryTabKind.EXTERNAL // changed with the heart, not list pickers
         },
     )

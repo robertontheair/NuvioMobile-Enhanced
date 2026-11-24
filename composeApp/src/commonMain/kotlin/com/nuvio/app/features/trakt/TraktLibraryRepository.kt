@@ -33,6 +33,7 @@ import kotlinx.serialization.json.Json
 
 private const val BASE_URL = "https://api.trakt.tv"
 private const val WATCHLIST_KEY = "trakt:watchlist"
+private const val FAVORITES_KEY = "trakt:favorites" // Total Eclipse
 private const val PERSONAL_LIST_PREFIX = "trakt:list:"
 private const val LIST_FETCH_CONCURRENCY = 3
 private const val TRAKT_PAGE_LIMIT = 1_000
@@ -452,7 +453,9 @@ object TraktLibraryRepository {
                 sortHow = "asc",
             ),
         )
-        return watchlistTabs + fetchPersonalLists(headers)
+        // Total Eclipse: Favorites (the heart) after the watchlist, as on the Apple TVs' Lists chips.
+        val favoritesTab = TraktListTab(key = FAVORITES_KEY, title = "Favorites", type = TraktListType.FAVORITES)
+        return watchlistTabs + favoritesTab + fetchPersonalLists(headers)
     }
 
     private suspend fun fetchEntriesByList(
@@ -487,6 +490,12 @@ object TraktLibraryRepository {
 
         entriesByList[WATCHLIST_KEY] = watchlistDeferred.await()
         onProgress?.invoke(entriesByList.toMap())
+        // Total Eclipse: Trakt favourites.
+        if (allTabs.any { it.key == FAVORITES_KEY }) {
+            entriesByList[FAVORITES_KEY] = runCatching { listSemaphore.withPermit { fetchFavoriteItems(headers) } }
+                .getOrElse { error -> if (error is CancellationException) throw error; emptyList() }
+            onProgress?.invoke(entriesByList.toMap())
+        }
 
         val pendingEntries = personalEntries.toMutableMap()
         while (pendingEntries.isNotEmpty()) {
@@ -550,6 +559,26 @@ object TraktLibraryRepository {
         return (movieItems + showItems)
             .mapNotNull(::mapToLibraryItem)
             .sortedByDescending { it.savedAtEpochMs }
+    }
+
+    /** Total Eclipse: /sync/favorites, movies and shows, newest first (same shape as the watchlist). */
+    private suspend fun fetchFavoriteItems(headers: Map<String, String>): List<LibraryItem> {
+        val (movieItems, showItems) = coroutineScope {
+            val moviesDeferred = async {
+                fetchPagedListItems(
+                    headers = headers,
+                    urlForPage = { page -> "$BASE_URL/sync/favorites/movies?extended=full,images&page=$page&limit=$TRAKT_PAGE_LIMIT" },
+                )
+            }
+            val showsDeferred = async {
+                fetchPagedListItems(
+                    headers = headers,
+                    urlForPage = { page -> "$BASE_URL/sync/favorites/shows?extended=full,images&page=$page&limit=$TRAKT_PAGE_LIMIT" },
+                )
+            }
+            moviesDeferred.await() to showsDeferred.await()
+        }
+        return (movieItems + showItems).mapNotNull(::mapToLibraryItem).sortedByDescending { it.savedAtEpochMs }
     }
 
     private suspend fun fetchPersonalListItems(

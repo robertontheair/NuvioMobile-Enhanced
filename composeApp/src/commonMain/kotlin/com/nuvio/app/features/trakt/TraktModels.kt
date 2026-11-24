@@ -44,6 +44,7 @@ enum class TraktBrandAsset {
 enum class TraktListType {
     WATCHLIST,
     PERSONAL,
+    FAVORITES, // Total Eclipse: Trakt favourites (heart), read-only here
 }
 
 @Serializable

@@ -90,7 +90,12 @@ internal object TotalEclipseFavorites {
                 ).also { if (it.status !in 200..299) InAppLogger.warn(TAG, "${if (adding) "add" else "remove"}: HTTP ${it.status}") }
                     .status in 200..299
             }.getOrDefault(false)
-            if (!ok) _keys.value = if (adding) _keys.value - key else _keys.value + key   // undo
+            if (!ok) {
+                _keys.value = if (adding) _keys.value - key else _keys.value + key   // undo
+            } else {
+                // The Library's Favorites tab reads the Trakt library; refresh it now.
+                runCatching { com.nuvio.app.features.trakt.TraktLibraryRepository.refreshNow() }
+            }
         }
     }
 }
