@@ -43,6 +43,20 @@ internal actual object HouseholdCloudStore {
         return out
     }
 
+    actual fun boolSettings(key: String): Map<String, Boolean> {
+        val dictionary = store.dictionaryForKey(key) ?: return emptyMap()
+        val out = HashMap<String, Boolean>()
+        for ((name, value) in dictionary) {
+            if (name !is String) continue
+            when (value) {
+                is Boolean -> out[name] = value
+                is platform.Foundation.NSNumber -> out[name] = value.boolValue
+                is Number -> out[name] = value.toInt() != 0
+            }
+        }
+        return out
+    }
+
     actual fun observe(onChange: () -> Unit) {
         if (observer != null) return
         observer = NSNotificationCenter.defaultCenter.addObserverForName(

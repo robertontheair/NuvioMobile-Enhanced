@@ -7,6 +7,7 @@ internal actual object HouseholdCloudStore {
     actual fun keys(): Set<String> = emptySet()
     actual fun text(key: String): String? = null
     actual fun stringSettings(key: String): Map<String, String> = emptyMap()
+    actual fun boolSettings(key: String): Map<String, Boolean> = emptyMap()
     actual fun observe(onChange: () -> Unit) = Unit
     actual fun loadLocal(key: String): String? = null
     actual fun saveLocal(key: String, value: String) = Unit

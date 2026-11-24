@@ -212,6 +212,8 @@ internal object HouseholdSync {
             if (failures == 0) markApplied("settings.$slot", import.toString())
         }
 
+        applyPlayerSettings(slot, tvId, reason)
+
         HouseholdCloudStore.text(TV_COLLECTIONS_PREFIX + tvId)?.takeIf { it.isNotBlank() }?.let { collections ->
             if (changedSinceLastApply("collections.$slot", collections)) {
                 CollectionRepository.importFromJson(collections)
@@ -382,6 +384,37 @@ internal object HouseholdSync {
             return second in 16..31
         }
         return false
+    }
+
+    /**
+     * The player switches both apps share, per profile (Mark's profile on the TVs auto-skips
+     * intros, recaps and credits and plays the next episode by itself). The TVs' PiP / Speed
+     * button choices don't map onto the phone's button layout, so they're left alone.
+     */
+    private fun applyPlayerSettings(slot: Int, tvId: String, reason: String) {
+        val tv = HouseholdCloudStore.boolSettings(TV_GLOBAL_SETTINGS_KEY) +
+            HouseholdCloudStore.boolSettings(TV_PROFILE_SETTINGS_PREFIX + tvId)
+        val skip = mapOf(
+            "nuvio.tv.settings.playback.autoSkipIntro" to com.nuvio.app.features.player.skip.AutoSkipSegmentType.INTRO,
+            "nuvio.tv.settings.playback.autoSkipRecap" to com.nuvio.app.features.player.skip.AutoSkipSegmentType.RECAP,
+            "nuvio.tv.settings.playback.autoSkipOutro" to com.nuvio.app.features.player.skip.AutoSkipSegmentType.OUTRO,
+            "nuvio.tv.settings.playback.autoSkipMovieCredits" to com.nuvio.app.features.player.skip.AutoSkipSegmentType.MOVIE_CREDITS,
+        )
+        val wanted = buildMap {
+            skip.keys.forEach { key -> tv[key]?.let { put(key, it) } }
+            tv["nuvio.tv.settings.playback.autoPlayNext"]?.let { put("autoPlayNext", it) }
+            tv["nuvio.tv.settings.playback.postPlayRecommendationsEnabled"]?.let { put("recommendations", it) }
+        }
+        if (wanted.isEmpty()) return
+        val fingerprintSource = wanted.entries.sortedBy { it.key }.joinToString(";") { "${it.key}=${it.value}" }
+        if (!changedSinceLastApply("player.$slot", fingerprintSource)) return
+        val player = com.nuvio.app.features.player.PlayerSettingsRepository
+        player.ensureLoaded()
+        skip.forEach { (key, type) -> wanted[key]?.let { player.setAutoSkipSegmentTypeEnabled(type, it) } }
+        wanted["autoPlayNext"]?.let(player::setStreamAutoPlayNextEpisodeEnabled)
+        wanted["recommendations"]?.let(player::setMovieRecommendationsEnabled)
+        markApplied("player.$slot", fingerprintSource)
+        InAppLogger.info(TAG, "$reason: profile $slot ← TV '$tvId' player switches (${wanted.size})")
     }
 
     private fun changedSinceLastApply(name: String, value: String): Boolean =

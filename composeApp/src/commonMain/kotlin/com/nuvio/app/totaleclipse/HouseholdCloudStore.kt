@@ -22,6 +22,9 @@ internal expect object HouseholdCloudStore {
     /** The String values of a dictionary value (settings of other types are skipped). */
     fun stringSettings(key: String): Map<String, String>
 
+    /** The true/false values of a dictionary value (the TVs store switches as numbers). */
+    fun boolSettings(key: String): Map<String, Boolean>
+
     /** Calls [onChange] on the main thread when another device changes the store. */
     fun observe(onChange: () -> Unit)
 
