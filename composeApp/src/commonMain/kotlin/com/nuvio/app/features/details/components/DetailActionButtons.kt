@@ -31,6 +31,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -473,6 +476,8 @@ private fun detailActionSet(
         }
         add(watchedAction)
         add(saveAction)
+        // Total Eclipse: Trakt ♥, as on the Apple TVs (only with Trakt connected).
+        totalEclipseFavoriteAction()?.let(::add)
     }
     return DetailActionSet(shuffleAction, watchedAction, saveAction, iconActions)
 }
@@ -805,4 +810,22 @@ private fun fitIconActionRow(
     } else {
         IconActionRowLayout(minSize, minSpacing, false)
     }
+}
+
+/** Total Eclipse: the Trakt ♥ for the title this details page shows, when Trakt is connected. */
+@Composable
+private fun totalEclipseFavoriteAction(): DetailSecondaryAction? {
+    val title = com.nuvio.app.totaleclipse.LocalTotalEclipseDetailTitle.current ?: return null
+    val connected = com.nuvio.app.features.trakt.TraktAuthRepository.hasRequiredCredentials()
+    if (!connected) return null
+    androidx.compose.runtime.LaunchedEffect(Unit) { com.nuvio.app.totaleclipse.TotalEclipseFavorites.ensureLoaded() }
+    val keys by com.nuvio.app.totaleclipse.TotalEclipseFavorites.keys.collectAsState()
+    val (type, id) = title
+    val isFavorite = com.nuvio.app.totaleclipse.TotalEclipseFavorites.key(type, id) in keys
+    return DetailSecondaryAction(
+        label = if (isFavorite) "Remove from Favorites" else "Add to Favorites",
+        icon = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+        isActive = isFavorite,
+        onClick = { com.nuvio.app.totaleclipse.TotalEclipseFavorites.toggle(type, id) },
+    )
 }

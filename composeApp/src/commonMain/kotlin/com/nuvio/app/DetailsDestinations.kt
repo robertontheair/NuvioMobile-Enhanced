@@ -84,78 +84,83 @@ internal fun DetailsDestination(
     val directorRole = stringResource(Res.string.person_role_director)
     val writerRole = stringResource(Res.string.person_role_writer)
     val creatorRole = stringResource(Res.string.person_role_creator)
-    MetaDetailsScreen(
-        type = route.type,
-        id = route.id,
-        initialSeasonNumber = route.initialSeasonNumber,
-        initialEpisodeNumber = route.initialEpisodeNumber,
-        onBack = onBack,
-        onPlay = onPlay,
-        onPlayManually = onPlayManually,
-        onPlayExternally = onPlayExternally,
-        onPlayFromStart = onPlayFromStart,
-        onOpenMeta = onOpenMeta,
-        onOpenMoreLikeThis = { meta ->
-            val source = meta.moreLikeThisSource
-            if (source != null) {
-                val launchId = CatalogLaunchStore.put(
-                    CatalogLaunch(
-                        title = moreLikeThisTitle,
-                        subtitle = meta.name,
-                        target = CatalogTarget.MoreLikeThis(
-                            itemId = meta.id,
-                            itemType = meta.type,
-                            source = source,
+    // Total Eclipse: tells the action row which title this is, for its Trakt ♥.
+    androidx.compose.runtime.CompositionLocalProvider(
+        com.nuvio.app.totaleclipse.LocalTotalEclipseDetailTitle provides (route.type to route.id),
+    ) {
+        MetaDetailsScreen(
+            type = route.type,
+            id = route.id,
+            initialSeasonNumber = route.initialSeasonNumber,
+            initialEpisodeNumber = route.initialEpisodeNumber,
+            onBack = onBack,
+            onPlay = onPlay,
+            onPlayManually = onPlayManually,
+            onPlayExternally = onPlayExternally,
+            onPlayFromStart = onPlayFromStart,
+            onOpenMeta = onOpenMeta,
+            onOpenMoreLikeThis = { meta ->
+                val source = meta.moreLikeThisSource
+                if (source != null) {
+                    val launchId = CatalogLaunchStore.put(
+                        CatalogLaunch(
+                            title = moreLikeThisTitle,
+                            subtitle = meta.name,
+                            target = CatalogTarget.MoreLikeThis(
+                                itemId = meta.id,
+                                itemType = meta.type,
+                                source = source,
+                            ),
                         ),
-                    ),
-                )
-                navController.navigate(
-                    CatalogRoute(
-                        launchId = launchId,
-                        title = moreLikeThisTitle,
-                        subtitle = meta.name,
-                    ),
-                )
-            }
-        },
-        onCastClick = { person, avatarTransitionKey ->
-            val tmdbId = person.tmdbId
-            if (tmdbId != null && tmdbId > 0) {
-                navController.navigate(
-                    PersonDetailRoute(
-                        personId = tmdbId,
-                        personName = person.name,
-                        personPhoto = person.photo,
-                        castAvatarTransitionKey = avatarTransitionKey,
-                        preferCrew = person.role?.let {
-                            it.equals("Director", ignoreCase = true) ||
-                                it.equals(directorRole, ignoreCase = true) ||
-                                it.equals("Writer", ignoreCase = true) ||
-                                it.equals(writerRole, ignoreCase = true) ||
-                                it.equals("Creator", ignoreCase = true) ||
-                                it.equals(creatorRole, ignoreCase = true)
-                        } ?: false,
-                    ),
-                )
-            }
-        },
-        onCompanyClick = { company, entityKind ->
-            val tmdbId = company.tmdbId
-            if (tmdbId != null && tmdbId > 0) {
-                navController.navigate(
-                    EntityBrowseRoute(
-                        entityKind = entityKind,
-                        entityId = tmdbId,
-                        entityName = company.name,
-                        sourceType = route.type,
-                    ),
-                )
-            }
-        },
-        sharedTransitionScope = sharedTransitionScope,
-        animatedVisibilityScope = animatedVisibilityScope,
-        modifier = Modifier.fillMaxSize(),
-    )
+                    )
+                    navController.navigate(
+                        CatalogRoute(
+                            launchId = launchId,
+                            title = moreLikeThisTitle,
+                            subtitle = meta.name,
+                        ),
+                    )
+                }
+            },
+            onCastClick = { person, avatarTransitionKey ->
+                val tmdbId = person.tmdbId
+                if (tmdbId != null && tmdbId > 0) {
+                    navController.navigate(
+                        PersonDetailRoute(
+                            personId = tmdbId,
+                            personName = person.name,
+                            personPhoto = person.photo,
+                            castAvatarTransitionKey = avatarTransitionKey,
+                            preferCrew = person.role?.let {
+                                it.equals("Director", ignoreCase = true) ||
+                                    it.equals(directorRole, ignoreCase = true) ||
+                                    it.equals("Writer", ignoreCase = true) ||
+                                    it.equals(writerRole, ignoreCase = true) ||
+                                    it.equals("Creator", ignoreCase = true) ||
+                                    it.equals(creatorRole, ignoreCase = true)
+                            } ?: false,
+                        ),
+                    )
+                }
+            },
+            onCompanyClick = { company, entityKind ->
+                val tmdbId = company.tmdbId
+                if (tmdbId != null && tmdbId > 0) {
+                    navController.navigate(
+                        EntityBrowseRoute(
+                            entityKind = entityKind,
+                            entityId = tmdbId,
+                            entityName = company.name,
+                            sourceType = route.type,
+                        ),
+                    )
+                }
+            },
+            sharedTransitionScope = sharedTransitionScope,
+            animatedVisibilityScope = animatedVisibilityScope,
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
 }
 
 @OptIn(ExperimentalSharedTransitionApi::class)
