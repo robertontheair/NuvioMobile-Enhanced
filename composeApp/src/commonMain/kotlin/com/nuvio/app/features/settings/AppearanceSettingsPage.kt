@@ -105,6 +105,8 @@ internal fun LazyListScope.appearanceSettingsContent(
                         onCheckedChange = ThemeSettingsRepository::setLiquidGlassEffectsEnabled,
                     )
                 }
+                // Total Eclipse: Nuvio's alternate icons are hidden (TotalEclipse.SHOW_APP_ICON_PICKER).
+                if (com.nuvio.app.totaleclipse.TotalEclipse.SHOW_APP_ICON_PICKER) {
                 SettingsGroupDivider(isTablet = isTablet)
                 SettingsNavigationRow(
                     title = stringResource(Res.string.settings_appearance_app_icon),
@@ -123,6 +125,7 @@ internal fun LazyListScope.appearanceSettingsContent(
                         showAppIconPicker = true
                     },
                 )
+                }
                 SettingsGroupDivider(isTablet = isTablet)
                 SettingsNavigationRow(
                     title = stringResource(Res.string.settings_appearance_app_language),

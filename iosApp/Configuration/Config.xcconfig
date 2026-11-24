@@ -2,5 +2,5 @@
 
 TEAM_ID=
 
-PRODUCT_NAME=Nuvio Enhanced
-PRODUCT_BUNDLE_IDENTIFIER=org.radiorob.nuvio
+PRODUCT_NAME=Total Eclipse
+PRODUCT_BUNDLE_IDENTIFIER=org.radiorob.totaleclipse
