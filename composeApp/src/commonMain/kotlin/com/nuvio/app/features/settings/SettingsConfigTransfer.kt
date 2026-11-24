@@ -214,6 +214,9 @@ internal object SettingsConfigTransfer {
         }
     }
 
+    /** Total Eclipse: the household (Apple TV) settings, applied quietly to the active profile. */
+    internal suspend fun importHousehold(settings: JsonObject): Int = importAll(settings)
+
     private suspend fun importAll(settings: JsonObject): Int {
         ensureRepositoriesLoaded()
         var failures = 0

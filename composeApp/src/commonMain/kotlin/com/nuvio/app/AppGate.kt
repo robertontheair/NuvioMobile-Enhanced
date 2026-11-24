@@ -478,6 +478,8 @@ internal fun AppGate(
             is AuthState.Authenticated -> {
                 val authenticatedState = authState as AuthState.Authenticated
                 ProfileRepository.ensureLoaded(authenticatedState.userId)
+                // Total Eclipse: join the household set up on the Apple TVs (read-only, iCloud).
+                com.nuvio.app.totaleclipse.HouseholdSync.start()
                 if (gateScreen == AppGateScreen.Loading.name || gateScreen == AppGateScreen.Auth.name) {
                     enterProfileGate(ProfileRepository.state.value.profiles, syncOnEnter = true)
                 }

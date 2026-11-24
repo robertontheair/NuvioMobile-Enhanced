@@ -213,6 +213,8 @@ object ProfileRepository {
         BatchDownloadCoordinator.clearLocalState()
         ServerRepository.onProfileChanged()
         ProfileSettingsSync.onProfileChanged()
+        // Total Eclipse: bring this profile's add-ons, keys and collections in line with the TVs.
+        com.nuvio.app.totaleclipse.HouseholdSync.onProfileSelected()
     }
 
     suspend fun pushProfiles(profiles: List<ProfilePushPayload>) {
