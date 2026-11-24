@@ -384,6 +384,17 @@ fun SearchScreen(
                 } else {
                     val normalizedQuery = query.trim()
                     val isWaitingForSearch = normalizedQuery.isNotBlank() && lastRequestedQuery != normalizedQuery
+                    // Total Eclipse: Live TV matches first, whatever the movie / show results are
+                    // (a channel-only search like "MSNOW" has none of those).
+                    if (onLiveTvChannelClick != null) {
+                        item(key = "totaleclipse_live_search") {
+                            com.nuvio.app.totaleclipse.TotalEclipseLiveSearchRow(
+                                query = query,
+                                onChannelClick = onLiveTvChannelClick,
+                                modifier = Modifier.padding(bottom = 12.dp),
+                            )
+                        }
+                    }
                     when {
                         isWaitingForSearch -> {
                             items(2) {
@@ -427,15 +438,6 @@ fun SearchScreen(
                         }
 
                         else -> {
-                            if (onLiveTvChannelClick != null) {
-                                item(key = "totaleclipse_live_search") {
-                                    com.nuvio.app.totaleclipse.TotalEclipseLiveSearchRow(
-                                        query = query,
-                                        onChannelClick = onLiveTvChannelClick,
-                                        modifier = Modifier.padding(bottom = 12.dp),
-                                    )
-                                }
-                            }
                             items(
                                 items = uiState.sections.withDuplicateSafeLazyKeys { section -> section.key },
                                 key = { section -> section.lazyKey },
