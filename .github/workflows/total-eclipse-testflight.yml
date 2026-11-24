@@ -110,7 +110,7 @@ jobs:
           # TestFlight accepts only numeric versions: 1.1.0-beta.3 → 1.1.0.
           file=iosApp/Configuration/Version.xcconfig
           marketing=$(sed -nE 's/^MARKETING_VERSION=([0-9]+(\.[0-9]+){0,2}).*/\1/p' "$file")
-          build=$((1000 + GITHUB_RUN_NUMBER))
+          build=$(date -u +%y%j%H%M)   # yyDDDHHmm, shared with scripts/testflight-local.sh
           sed -i '' -E "s/^MARKETING_VERSION=.*/MARKETING_VERSION=${marketing}/; s/^CURRENT_PROJECT_VERSION=.*/CURRENT_PROJECT_VERSION=${build}/" "$file"
           cat "$file"
           echo "### Total Eclipse ${marketing} (${build})" >> "$GITHUB_STEP_SUMMARY"
