@@ -73,6 +73,7 @@ private fun parseEnabledStateLine(line: String): Pair<String, Boolean>? {
 }
 
 private val addonHttpClient = HttpClient(Darwin) {
+    install(com.nuvio.app.totaleclipse.TraktRateLimitGate.plugin) // Total Eclipse: Trakt-wide 429 back-off
     install(HttpTimeout) {
         requestTimeoutMillis = 60_000
         connectTimeoutMillis = 60_000
