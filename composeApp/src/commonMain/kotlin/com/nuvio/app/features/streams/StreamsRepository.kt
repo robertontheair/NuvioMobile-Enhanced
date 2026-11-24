@@ -123,8 +123,12 @@ object StreamsRepository {
                     !StreamAutoPlayPolicy.isRegexSelectionConfigured(playerSettings.streamAutoPlayRegex))
             )
 
-        // Look up persisted binge group when both settings are enabled
+        // Look up persisted binge group when both settings are enabled.
+        // Total Eclipse: only for an episode. A binge group exists to keep the same release across
+        // a show's episodes; applied to a movie it overrode the add-on's ranking with whatever was
+        // played last (on the Apple TV, Halloween auto-played a Russian remux). HomeTV fix 6970003ea.
         val persistedBingeGroup = if (
+            episode != null &&
             playerSettings.streamAutoPlayPreferBingeGroup &&
             playerSettings.streamAutoPlayReuseBingeGroup
         ) {
