@@ -44,108 +44,114 @@ internal fun PlayerDestination(
     LaunchedEffect(launch.videoId) {
         launch.videoId?.let { ResumePromptRepository.markPlayerEntered(it) }
     }
-    PlayerScreen(
-        profileId = launch.profileId,
-        title = launch.title,
-        sourceUrl = launch.sourceUrl,
-        sourceAudioUrl = launch.sourceAudioUrl,
-        sourceHeaders = launch.sourceHeaders,
-        sourceResponseHeaders = launch.sourceResponseHeaders,
-        externalSubtitles = launch.externalSubtitles,
-        streamType = launch.streamType,
-        logo = launch.logo,
-        poster = launch.poster,
-        background = launch.background,
-        seasonNumber = launch.seasonNumber,
-        episodeNumber = launch.episodeNumber,
-        episodeTitle = launch.episodeTitle,
-        episodeThumbnail = launch.episodeThumbnail,
-        streamTitle = launch.streamTitle,
-        streamSubtitle = launch.streamSubtitle,
-        initialBingeGroup = launch.bingeGroup,
-        pauseDescription = launch.pauseDescription,
-        providerName = launch.providerName,
-        providerAddonId = launch.providerAddonId,
-        contentType = launch.contentType,
-        videoId = launch.videoId,
-        parentMetaId = launch.parentMetaId,
-        parentMetaType = launch.parentMetaType,
-        torrentInfoHash = launch.torrentInfoHash,
-        torrentFileIdx = launch.torrentFileIdx,
-        torrentFilename = launch.torrentFilename,
-        torrentTrackers = launch.torrentTrackers,
-        initialPositionMs = launch.initialPositionMs,
-        initialProgressFraction = launch.initialProgressFraction,
-        contentLanguage = launch.contentLanguage,
-        subtitleExtras = launch.subtitleExtras,
-        launchId = route.launchId,
-        sourceFilename = launch.sourceFilename,
-        stream = launch.stream,
-        sourceFromLinkCache = launch.sourceFromLinkCache,
-        sourceAutoSelected = launch.sourceAutoSelected,
-        onBack = onBack,
-        onOpenInExternalPlayer = { request ->
-            val playerLaunch = PlayerLaunch(
-                profileId = launch.profileId,
-                title = launch.title,
-                sourceUrl = request.sourceUrl,
-                sourceHeaders = request.sourceHeaders,
-                logo = launch.logo,
-                poster = launch.poster,
-                background = launch.background,
-                seasonNumber = launch.seasonNumber,
-                episodeNumber = launch.episodeNumber,
-                episodeTitle = launch.episodeTitle,
-                episodeThumbnail = launch.episodeThumbnail,
-                streamTitle = request.streamTitle ?: launch.streamTitle,
-                streamSubtitle = launch.streamSubtitle,
-                bingeGroup = launch.bingeGroup,
-                pauseDescription = launch.pauseDescription,
-                providerName = launch.providerName,
-                providerAddonId = launch.providerAddonId,
-                contentType = launch.contentType,
-                videoId = launch.videoId,
-                parentMetaId = launch.parentMetaId,
-                parentMetaType = launch.parentMetaType,
-                initialPositionMs = request.resumePositionMs,
-                subtitleExtras = launch.subtitleExtras,
-            )
-            onExternalPlayerLaunch(playerLaunch)
-            val intentResult = ExternalPlayerPlatform.buildIntent(
-                request = request,
-                playerId = externalPlayerId,
-            )
-            when (intentResult) {
-                is ExternalPlayerIntentResult.Success -> {
-                    val launched = launchExternalPlayer(intentResult)
-                    if (!launched) {
+    // Total Eclipse: tells the player toolbar which title this is, for its Trakt ♥.
+    androidx.compose.runtime.CompositionLocalProvider(
+        com.nuvio.app.totaleclipse.LocalTotalEclipseDetailTitle provides
+            launch.parentMetaType?.let { type -> launch.parentMetaId?.let { id -> type to id } },
+    ) {
+        PlayerScreen(
+            profileId = launch.profileId,
+            title = launch.title,
+            sourceUrl = launch.sourceUrl,
+            sourceAudioUrl = launch.sourceAudioUrl,
+            sourceHeaders = launch.sourceHeaders,
+            sourceResponseHeaders = launch.sourceResponseHeaders,
+            externalSubtitles = launch.externalSubtitles,
+            streamType = launch.streamType,
+            logo = launch.logo,
+            poster = launch.poster,
+            background = launch.background,
+            seasonNumber = launch.seasonNumber,
+            episodeNumber = launch.episodeNumber,
+            episodeTitle = launch.episodeTitle,
+            episodeThumbnail = launch.episodeThumbnail,
+            streamTitle = launch.streamTitle,
+            streamSubtitle = launch.streamSubtitle,
+            initialBingeGroup = launch.bingeGroup,
+            pauseDescription = launch.pauseDescription,
+            providerName = launch.providerName,
+            providerAddonId = launch.providerAddonId,
+            contentType = launch.contentType,
+            videoId = launch.videoId,
+            parentMetaId = launch.parentMetaId,
+            parentMetaType = launch.parentMetaType,
+            torrentInfoHash = launch.torrentInfoHash,
+            torrentFileIdx = launch.torrentFileIdx,
+            torrentFilename = launch.torrentFilename,
+            torrentTrackers = launch.torrentTrackers,
+            initialPositionMs = launch.initialPositionMs,
+            initialProgressFraction = launch.initialProgressFraction,
+            contentLanguage = launch.contentLanguage,
+            subtitleExtras = launch.subtitleExtras,
+            launchId = route.launchId,
+            sourceFilename = launch.sourceFilename,
+            stream = launch.stream,
+            sourceFromLinkCache = launch.sourceFromLinkCache,
+            sourceAutoSelected = launch.sourceAutoSelected,
+            onBack = onBack,
+            onOpenInExternalPlayer = { request ->
+                val playerLaunch = PlayerLaunch(
+                    profileId = launch.profileId,
+                    title = launch.title,
+                    sourceUrl = request.sourceUrl,
+                    sourceHeaders = request.sourceHeaders,
+                    logo = launch.logo,
+                    poster = launch.poster,
+                    background = launch.background,
+                    seasonNumber = launch.seasonNumber,
+                    episodeNumber = launch.episodeNumber,
+                    episodeTitle = launch.episodeTitle,
+                    episodeThumbnail = launch.episodeThumbnail,
+                    streamTitle = request.streamTitle ?: launch.streamTitle,
+                    streamSubtitle = launch.streamSubtitle,
+                    bingeGroup = launch.bingeGroup,
+                    pauseDescription = launch.pauseDescription,
+                    providerName = launch.providerName,
+                    providerAddonId = launch.providerAddonId,
+                    contentType = launch.contentType,
+                    videoId = launch.videoId,
+                    parentMetaId = launch.parentMetaId,
+                    parentMetaType = launch.parentMetaType,
+                    initialPositionMs = request.resumePositionMs,
+                    subtitleExtras = launch.subtitleExtras,
+                )
+                onExternalPlayerLaunch(playerLaunch)
+                val intentResult = ExternalPlayerPlatform.buildIntent(
+                    request = request,
+                    playerId = externalPlayerId,
+                )
+                when (intentResult) {
+                    is ExternalPlayerIntentResult.Success -> {
+                        val launched = launchExternalPlayer(intentResult)
+                        if (!launched) {
+                            NuvioToastController.show(externalPlayerFailedText)
+                        } else if (externalPlayerId == "infuse") {
+                            onBack()
+                        }
+                    }
+                    ExternalPlayerIntentResult.NotConfigured -> {
+                        NuvioToastController.show(externalPlayerNotConfiguredText)
+                    }
+                    ExternalPlayerIntentResult.Failed -> {
                         NuvioToastController.show(externalPlayerFailedText)
-                    } else if (externalPlayerId == "infuse") {
-                        onBack()
                     }
                 }
-                ExternalPlayerIntentResult.NotConfigured -> {
-                    NuvioToastController.show(externalPlayerNotConfiguredText)
-                }
-                ExternalPlayerIntentResult.Failed -> {
-                    NuvioToastController.show(externalPlayerFailedText)
-                }
-            }
-        },
-        onOpenExternalUrl = { url ->
-            openExternalStreamUrl(url)
-        },
-        onOpenMetaDetails = { preview ->
-            onBack()
-            navController.navigate(
-                DetailRoute(
-                    type = preview.type,
-                    id = preview.id,
-                    title = preview.name,
-                ),
-            )
-        },
-        onOpenPartyMedia = onOpenPartyMedia,
-        modifier = Modifier.fillMaxSize(),
-    )
+            },
+            onOpenExternalUrl = { url ->
+                openExternalStreamUrl(url)
+            },
+            onOpenMetaDetails = { preview ->
+                onBack()
+                navController.navigate(
+                    DetailRoute(
+                        type = preview.type,
+                        id = preview.id,
+                        title = preview.name,
+                    ),
+                )
+            },
+            onOpenPartyMedia = onOpenPartyMedia,
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
 }

@@ -12,6 +12,7 @@ enum class PlayerToolbarButton(val storageId: String) {
     SOURCES("sources"),
     EPISODES("episodes"),
     RATE("rate"),
+    FAVORITE("totaleclipse_favorite"), // Total Eclipse: Trakt ♥, as on the Apple TVs
     EXTERNAL_PLAYER("external_player"),
     PLAYBACK_INFO("playback_info"),
     SWITCH_ENGINE("switch_engine"),
@@ -67,6 +68,7 @@ data class PlayerToolbarLayout(val entries: List<PlayerToolbarEntry>) {
                     PlayerToolbarButton.SOURCES,
                     PlayerToolbarButton.EPISODES,
                     PlayerToolbarButton.RATE,
+                    PlayerToolbarButton.FAVORITE,
                     PlayerToolbarButton.EXTERNAL_PLAYER,
                     PlayerToolbarButton.PLAYBACK_INFO,
                     PlayerToolbarButton.SWITCH_ENGINE,

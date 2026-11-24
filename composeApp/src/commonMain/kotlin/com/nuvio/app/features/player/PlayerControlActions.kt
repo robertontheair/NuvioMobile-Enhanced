@@ -49,6 +49,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -269,6 +271,20 @@ internal fun PlayerControlActions(
                 icon = if (userRating != null) Icons.Rounded.Star else Icons.Rounded.StarBorder,
             )
         }
+        // Total Eclipse: Trakt ♥ for the title playing (only with Trakt connected).
+        com.nuvio.app.totaleclipse.LocalTotalEclipseDetailTitle.current
+            ?.takeIf { com.nuvio.app.features.trakt.TraktAuthRepository.hasRequiredCredentials() }
+            ?.let { (type, id) ->
+                androidx.compose.runtime.LaunchedEffect(Unit) { com.nuvio.app.totaleclipse.TotalEclipseFavorites.ensureLoaded() }
+                val keys by com.nuvio.app.totaleclipse.TotalEclipseFavorites.keys.collectAsState()
+                val isFavorite = com.nuvio.app.totaleclipse.TotalEclipseFavorites.key(type, id) in keys
+                this[PlayerToolbarButton.FAVORITE] = PlayerControlAction(
+                    if (isFavorite) "Remove from Favorites" else "Add to Favorites",
+                    { com.nuvio.app.totaleclipse.TotalEclipseFavorites.toggle(type, id) },
+                    icon = if (isFavorite) androidx.compose.material.icons.Icons.Rounded.Favorite
+                        else androidx.compose.material.icons.Icons.Rounded.FavoriteBorder,
+                )
+            }
         onOpenInExternalPlayer?.let {
             this[PlayerToolbarButton.EXTERNAL_PLAYER] = PlayerControlAction(
                 stringResource(Res.string.streams_open_external_player), it,
