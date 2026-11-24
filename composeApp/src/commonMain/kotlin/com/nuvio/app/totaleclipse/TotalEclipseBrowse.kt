@@ -69,8 +69,11 @@ internal object TotalEclipseBrowse {
                 pinned = pinned.map(::withoutViewAll),
                 personal = personalRows.map(::withoutViewAll),
             )
-            val hero = home.heroItems.filter { kind.includesType(it.type) }
-                .ifEmpty { sections.firstOrNull()?.items?.take(10).orEmpty() }
+            // As on the TVs (CollectionHomeModel: hero = the first row's titles): the hero is the
+            // first Browse catalog (e.g. Trending), not Home's hero picks.
+            val firstCatalog = tvTitles(store.getCatalogSectionsForRows(), folderState)
+                .let { arrangeLikeTheTVs(it) }.firstOrNull()
+            val hero = firstCatalog?.items?.take(10).orEmpty()
             HomeUiState(
                 isLoading = target != null && folderState.isLoading && sections.isEmpty(),
                 heroItems = hero,
