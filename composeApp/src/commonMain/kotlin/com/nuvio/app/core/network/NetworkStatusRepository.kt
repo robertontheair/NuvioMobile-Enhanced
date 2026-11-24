@@ -136,6 +136,12 @@ object NetworkStatusRepository {
             return NetworkCondition.NoInternet
         }
 
+        // Total Eclipse: with no Nuvio service configured (placeholder https://localhost) there's
+        // nothing to reach; probing it made every screen say the servers were unreachable.
+        if (!isPublicServerHost(ServerConfigurationRepository.active.value.backendUrl)) {
+            return NetworkCondition.Online
+        }
+
         val supabaseReachable = SupabaseEndpointConfig.restEndpointUrls().any { url ->
             probeReachable(
                 url = url,
