@@ -57,6 +57,10 @@ echo "==> Embed entitlements"
 app=$(find "$archive/Products/Applications" -maxdepth 1 -name '*.app' | head -1)
 sed 's/$(TeamIdentifierPrefix)/B2Z256T95E./' iosApp/iosApp/iosApp.entitlements > "$out/app.entitlements"
 codesign --force --deep --sign - --timestamp=none --entitlements "$out/app.entitlements" "$app"
+# Nested frameworks (MPV / FFmpeg) must not keep that ad-hoc signature: App Store Connect rejects
+# them. Unsigned, the export signs them with the distribution certificate.
+find "$app/Frameworks" "$app/PlugIns" -maxdepth 1 \( -name '*.framework' -o -name '*.dylib' -o -name '*.appex' \) 2>/dev/null \
+    | while IFS= read -r nested; do codesign --remove-signature "$nested"; done
 codesign -d --entitlements :- "$app" 2>/dev/null | grep -q "B2Z256T95E.org.radiorob.hometv" \
     || { echo "The archived app has no iCloud key-value store entitlement" >&2; exit 1; }
 

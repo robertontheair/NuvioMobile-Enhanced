@@ -137,6 +137,10 @@ jobs:
           app=$(find "$RUNNER_TEMP/TotalEclipse.xcarchive/Products/Applications" -maxdepth 1 -name '*.app' | head -1)
           sed 's/$(TeamIdentifierPrefix)/B2Z256T95E./' iosApp/iosApp/iosApp.entitlements > "$RUNNER_TEMP/app.entitlements"
           codesign --force --deep --sign - --timestamp=none --entitlements "$RUNNER_TEMP/app.entitlements" "$app"
+          # Nested frameworks must not keep that ad-hoc signature (App Store Connect rejects them);
+          # unsigned, the export signs them with the distribution certificate.
+          find "$app/Frameworks" "$app/PlugIns" -maxdepth 1 \( -name '*.framework' -o -name '*.dylib' -o -name '*.appex' \) 2>/dev/null \
+            | while IFS= read -r nested; do codesign --remove-signature "$nested"; done
           if ! codesign -d --entitlements :- "$app" 2>/dev/null | grep -q "B2Z256T95E.org.radiorob.hometv"; then
             echo "::error::The archived app has no iCloud key-value store entitlement"
             exit 1
