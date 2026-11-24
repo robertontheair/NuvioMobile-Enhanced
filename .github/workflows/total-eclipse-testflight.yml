@@ -1,0 +1,156 @@
+# Total Eclipse: build the iOS app and upload it to TestFlight.
+#
+# Runs on every push to main (a newer push cancels a build in progress) and on demand.
+# Signing uses an App Store Connect API key with cloud-managed certificates, so no
+# certificate or provisioning profile is stored in the repo or its secrets.
+#
+# Repository secrets (Settings → Secrets and variables → Actions):
+#   ASC_KEY_ID        App Store Connect API key ID
+#   ASC_ISSUER_ID     App Store Connect issuer ID
+#   ASC_KEY_P8        contents of the AuthKey_<id>.p8 file
+#   TRAKT_CLIENT_ID   Trakt API app Client ID (the same one HomeTV uses; no secret needed)
+#   TMDB_API_KEY      optional
+name: Total Eclipse TestFlight
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['**.md', 'docs/**', 'Docs/**']
+  workflow_dispatch:
+
+concurrency:
+  group: total-eclipse-testflight
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  testflight:
+    name: Build and upload
+    if: github.repository == 'robertontheair/NuvioMobile-Enhanced'
+    runs-on: xcode-27
+    timeout-minutes: 150
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.2.app/Contents/Developer
+      NUVIO_IOS_DISTRIBUTION: full
+      GRADLE_OPTS: -Dfile.encoding=UTF-8
+    steps:
+      - name: Check the secrets are set
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
+        run: |
+          missing=()
+          for name in ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8 TRAKT_CLIENT_ID; do
+            [[ -n "${!name}" ]] || missing+=("$name")
+          done
+          if (( ${#missing[@]} )); then
+            echo "::error::Missing repository secrets: ${missing[*]}"
+            exit 1
+          fi
+
+      - name: Check out
+        uses: actions/checkout@v6
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Cache Kotlin Native
+        uses: actions/cache@v5
+        with:
+          path: ~/.konan
+          key: konan-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('gradle/libs.versions.toml') }}
+          restore-keys: konan-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Write runtime properties and the API key
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+        run: |
+          {
+            printf 'TRAKT_CLIENT_ID=%s\n' "$TRAKT_CLIENT_ID"
+            if [[ -n "$TMDB_API_KEY" ]]; then printf 'TMDB_API_KEY=%s\n' "$TMDB_API_KEY"; fi
+          } > local.properties
+          key_dir="$RUNNER_TEMP/asc"
+          mkdir -p "$key_dir"
+          printf '%s\n' "$ASC_KEY_P8" > "$key_dir/AuthKey_${ASC_KEY_ID}.p8"
+          echo "ASC_KEY_PATH=$key_dir/AuthKey_${ASC_KEY_ID}.p8" >> "$GITHUB_ENV"
+
+      - name: Keep Gradle within the runner's memory
+        run: |
+          mkdir -p ~/.gradle
+          {
+            echo "org.gradle.jvmargs=-Xmx2048M -Dfile.encoding=UTF-8 -XX:MaxMetaspaceSize=768M -XX:+UseG1GC"
+            echo "kotlin.daemon.jvmargs=-Xmx1024M"
+            echo "kotlin.native.jvmArgs=-Xmx9216M -XX:+UseG1GC"
+            echo "org.gradle.parallel=false"
+            echo "org.gradle.workers.max=1"
+            echo "kotlin.native.disableCompilerDaemon=true"
+          } >> ~/.gradle/gradle.properties
+
+      - name: Set the version and build number
+        run: |
+          # TestFlight accepts only numeric versions: 1.1.0-beta.3 → 1.1.0.
+          file=iosApp/Configuration/Version.xcconfig
+          marketing=$(sed -nE 's/^MARKETING_VERSION=([0-9]+(\.[0-9]+){0,2}).*/\1/p' "$file")
+          build=$((1000 + GITHUB_RUN_NUMBER))
+          sed -i '' -E "s/^MARKETING_VERSION=.*/MARKETING_VERSION=${marketing}/; s/^CURRENT_PROJECT_VERSION=.*/CURRENT_PROJECT_VERSION=${build}/" "$file"
+          cat "$file"
+          echo "### Total Eclipse ${marketing} (${build})" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Prepare iOS dependencies
+        run: ./scripts/prepare-ios-dependencies.sh
+
+      - name: Archive
+        run: |
+          xcodebuild archive \
+            -project iosApp/iosApp.xcodeproj \
+            -scheme iosApp \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/TotalEclipse.xcarchive" \
+            -derivedDataPath build/ios-derived-release \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=
+
+      - name: Sign and upload to TestFlight
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>teamID</key><string>B2Z256T95E</string>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+            <key>uploadSymbols</key><true/>
+          </dict>
+          </plist>
+          PLIST
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/TotalEclipse.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+
+      - name: Remove the API key
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/asc" local.properties
