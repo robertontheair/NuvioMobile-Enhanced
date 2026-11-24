@@ -39,6 +39,13 @@ echo "==> Total Eclipse ${marketing} (${build})"
 
 echo "==> Archive (Release, unsigned)"
 rm -rf "$archive"
+# Memory: Gradle and the Kotlin/Native compiler each ask for 12 GB, and the release link's
+# optimizer ran out of heap on a 24 GB Mac. As upstream's release build: compiler in its own
+# process, and the three heaviest optimizer passes off. Idle Gradle daemons are stopped first.
+./gradlew --stop >/dev/null 2>&1 || true
+env \
+    "ORG_GRADLE_PROJECT_kotlin.native.disableCompilerDaemon=true" \
+    "ORG_GRADLE_PROJECT_nuvio.ios.releaseDisablePhases=DevirtualizationAnalysis,Devirtualization,RemoveRedundantCallsToStaticInitializersPhase" \
 xcodebuild archive \
     -project iosApp/iosApp.xcodeproj -scheme iosApp -configuration Release \
     -destination 'generic/platform=iOS' -archivePath "$archive" \
