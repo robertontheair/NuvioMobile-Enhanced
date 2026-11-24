@@ -1956,6 +1956,7 @@ internal fun MainAppContent(
                         onPosterClick = navController::openPreview,
                         onPosterLongClick = { meta -> openPosterActions(PosterActionTarget(preview = meta)) },
                         searchFocusRequestCount = 1,
+                        onLiveTvChannelClick = onLiveTvChannelClick,
                     )
                 }
                 entry<DownloadsRoute> { route ->

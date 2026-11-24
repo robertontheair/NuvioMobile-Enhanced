@@ -106,6 +106,8 @@ fun SearchScreen(
     onPosterLongClick: ((MetaPreview) -> Unit)? = null,
     searchFocusRequestCount: Int = 0,
     scrollToTopRequests: Flow<Unit> = emptyFlow(),
+    // Total Eclipse: Live TV channels in the results (set where Search can play a channel).
+    onLiveTvChannelClick: ((com.nuvio.app.features.livetv.LiveTvChannel) -> Unit)? = null,
 ) {
     val focusRequester = remember { FocusRequester() }
     var isSearchFocused by remember { mutableStateOf(false) }
@@ -425,6 +427,15 @@ fun SearchScreen(
                         }
 
                         else -> {
+                            if (onLiveTvChannelClick != null) {
+                                item(key = "totaleclipse_live_search") {
+                                    com.nuvio.app.totaleclipse.TotalEclipseLiveSearchRow(
+                                        query = query,
+                                        onChannelClick = onLiveTvChannelClick,
+                                        modifier = Modifier.padding(bottom = 12.dp),
+                                    )
+                                }
+                            }
                             items(
                                 items = uiState.sections.withDuplicateSafeLazyKeys { section -> section.key },
                                 key = { section -> section.lazyKey },
