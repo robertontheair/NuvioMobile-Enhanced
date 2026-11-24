@@ -53,6 +53,15 @@ xcodebuild archive \
     CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY= \
     > "$out/archive.log" 2>&1 || { tail -40 "$out/archive.log"; exit 1; }
 
+# App Store Connect rejects builds that reference private API (ITMS-90338). Catch the ones
+# that have bitten this app before uploading.
+for symbol in _CCCryptorGCMEncrypt _CCCryptorGCMDecrypt _CCCryptorGCMFinal _CCCryptorGCMAddAAD; do
+    if nm -u "$(find "$archive/Products/Applications" -maxdepth 1 -name '*.app' | head -1)/Total Eclipse" 2>/dev/null | grep -qx "$symbol"; then
+        echo "Private API $symbol is referenced; App Store Connect would reject this build" >&2
+        exit 1
+    fi
+done
+
 echo "==> Embed entitlements"
 app=$(find "$archive/Products/Applications" -maxdepth 1 -name '*.app' | head -1)
 sed 's/$(TeamIdentifierPrefix)/B2Z256T95E./' iosApp/iosApp/iosApp.entitlements > "$out/app.entitlements"

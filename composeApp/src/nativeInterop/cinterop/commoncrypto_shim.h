@@ -158,31 +158,9 @@ CCCryptorStatus CCCryptorCreateWithMode(
     CCCryptorRef *cryptorRef
 );
 
-CCCryptorStatus CCCryptorGCMAddAAD(
-    CCCryptorRef cryptorRef,
-    const void *aData,
-    size_t aDataLen
-);
-
-CCCryptorStatus CCCryptorGCMEncrypt(
-    CCCryptorRef cryptorRef,
-    const void *dataIn,
-    size_t dataInLength,
-    void *dataOut
-);
-
-CCCryptorStatus CCCryptorGCMDecrypt(
-    CCCryptorRef cryptorRef,
-    const void *dataIn,
-    size_t dataInLength,
-    void *dataOut
-);
-
-CCCryptorStatus CCCryptorGCMFinal(
-    CCCryptorRef cryptorRef,
-    void *tag,
-    size_t *tagLength
-);
+/* Total Eclipse: CCCryptorGCMAddAAD / Encrypt / Decrypt / Final removed. They are private
+   API and App Store Connect rejects builds that reference them (ITMS-90338); AES-GCM is
+   TotalEclipseAesGcm.kt over public AES-ECB instead. */
 
 CCCryptorStatus CCCryptorRelease(
     CCCryptorRef cryptorRef
