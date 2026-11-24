@@ -40,7 +40,7 @@ fun MainViewController(
             useNativeNavigation = true,
             useNativeTabBar = useNativeTabBar,
             useTabletFloatingTabBar = useTabletFloatingTabBar,
-            ownsAppRuntime = initialTab == AppScreenTab.Home,
+            ownsAppRuntime = initialTab == AppScreenTab.Movies, // Total Eclipse: Movies is the first tab
             bypassAppGate = true,
             onNavigate = onNavigate,
             onGoBack = onGoBack,

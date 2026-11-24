@@ -4,6 +4,9 @@ import com.nuvio.app.core.ui.NativeNavigationTab
 
 enum class AppScreenTab {
     Home,
+    // Total Eclipse: the Apple TVs' Movies / Shows tabs (see TotalEclipseBrowse).
+    Movies,
+    Shows,
     Search,
     Library,
     LiveTv,
@@ -18,6 +21,8 @@ enum class AppScreenTab {
 
 internal fun AppScreenTab.toNativeNavigationTab(): NativeNavigationTab = when (this) {
     AppScreenTab.Home -> NativeNavigationTab.Home
+    AppScreenTab.Movies -> NativeNavigationTab.Movies
+    AppScreenTab.Shows -> NativeNavigationTab.Shows
     AppScreenTab.Search -> NativeNavigationTab.Search
     AppScreenTab.Library -> NativeNavigationTab.Library
     AppScreenTab.LiveTv -> NativeNavigationTab.LiveTv
@@ -26,6 +31,8 @@ internal fun AppScreenTab.toNativeNavigationTab(): NativeNavigationTab = when (t
 
 internal fun NativeNavigationTab.toAppScreenTab(): AppScreenTab = when (this) {
     NativeNavigationTab.Home -> AppScreenTab.Home
+    NativeNavigationTab.Movies -> AppScreenTab.Movies
+    NativeNavigationTab.Shows -> AppScreenTab.Shows
     NativeNavigationTab.Search -> AppScreenTab.Search
     NativeNavigationTab.Library -> AppScreenTab.Library
     NativeNavigationTab.LiveTv -> AppScreenTab.LiveTv

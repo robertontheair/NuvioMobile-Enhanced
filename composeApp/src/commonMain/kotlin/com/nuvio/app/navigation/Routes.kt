@@ -33,6 +33,10 @@ sealed interface SettingsDestinationRoute : AppRoute {
 @Serializable
 data object TabsRoute : AppRoute
 
+/** Total Eclipse: Search opens from the Movies / Shows tabs (it isn't a tab here). */
+@Serializable
+data class SearchRoute(override val title: String = "") : AppRoute
+
 @Serializable
 data class DetailRoute(
     val type: String,

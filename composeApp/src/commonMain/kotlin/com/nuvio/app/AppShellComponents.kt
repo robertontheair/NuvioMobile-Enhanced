@@ -177,6 +177,7 @@ internal data class AppTabActions(
     val onCollectionsSettingsClick: () -> Unit = {},
     val onWatchPartySettingsClick: () -> Unit = {},
     val onFolderClick: ((collectionId: String, folderId: String) -> Unit)? = null,
+    val onSearchClick: () -> Unit = {}, // Total Eclipse: Search opens from Movies / Shows
     val onRequestedSettingsPageConsumed: () -> Unit = {},
     val onInitialHomeContentRendered: () -> Unit = {},
 )
@@ -214,6 +215,31 @@ internal fun AppTabHost(
                             onFirstCatalogRendered = actions.onInitialHomeContentRendered,
                         )
                     }
+                }
+            }
+
+            // Total Eclipse: Movies / Shows, with Search as a button (it isn't a tab here).
+            AppScreenTab.Movies, AppScreenTab.Shows -> {
+                val kind = if (tab == AppScreenTab.Movies) {
+                    com.nuvio.app.totaleclipse.TotalEclipseBrowseKind.Movies
+                } else {
+                    com.nuvio.app.totaleclipse.TotalEclipseBrowseKind.Shows
+                }
+                com.nuvio.app.totaleclipse.TotalEclipseBrowseTab(onSearchClick = actions.onSearchClick) {
+                    HomeScreen(
+                        modifier = Modifier.fillMaxSize(),
+                        animateCollectionGifs = state.animateHomeCollectionGifs,
+                        scrollToTopRequests = requests.homeScrollToTopRequests,
+                        onCatalogClick = actions.onCatalogClick,
+                        onPosterClick = actions.onPosterClick,
+                        onPosterLongClick = actions.onPosterLongClick,
+                        onContinueWatchingClick = actions.onContinueWatchingClick,
+                        onContinueWatchingLongPress = actions.onContinueWatchingLongPress,
+                        continueWatchingDisintegrationRequest = state.continueWatchingDisintegrationRequest,
+                        onFolderClick = actions.onFolderClick,
+                        onFirstCatalogRendered = actions.onInitialHomeContentRendered,
+                        browse = kind,
+                    )
                 }
             }
 

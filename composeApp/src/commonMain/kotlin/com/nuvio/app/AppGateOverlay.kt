@@ -22,7 +22,7 @@ internal fun AppGateOverlay(
 
     AppEnvironment(drawAppBackground = false) {
         AppGate(
-            initialTab = AppScreenTab.Home,
+            initialTab = AppScreenTab.Movies, // Total Eclipse: Movies is the first tab
             initialRoute = TabsRoute,
             useNativeNavigation = true,
             useNativeTabBar = true,

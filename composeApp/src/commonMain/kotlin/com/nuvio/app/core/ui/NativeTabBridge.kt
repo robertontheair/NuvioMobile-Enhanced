@@ -26,6 +26,8 @@ import kotlinx.coroutines.launch
 
 internal enum class NativeNavigationTab {
     Home,
+    Movies, // Total Eclipse
+    Shows, // Total Eclipse
     Search,
     Library,
     LiveTv,

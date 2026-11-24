@@ -91,7 +91,9 @@ data class FolderDetailUiState(
         }
 }
 
-object FolderDetailRepository {
+// Total Eclipse: a class, so the Movies and Shows tabs can each load their own folder;
+// FolderDetailRepository stays the shared instance the folder screen uses.
+open class FolderDetailStore {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val log = Logger.withTag("FolderDetailRepository")
 
@@ -479,6 +481,8 @@ object FolderDetailRepository {
         }
     }
 }
+
+object FolderDetailRepository : FolderDetailStore()
 
 private fun Boolean?.orFalse(): Boolean = this == true
 

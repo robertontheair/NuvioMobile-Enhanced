@@ -442,7 +442,7 @@ internal fun MainAppContent(
 
     fun activateTab(tab: AppScreenTab) {
         val destination = if (tab == AppScreenTab.LiveTv && !showLiveTvInNavigation) {
-            AppScreenTab.Home
+            AppScreenTab.Movies // Total Eclipse: Movies is the first tab
         } else {
             tab
         }
@@ -468,7 +468,7 @@ internal fun MainAppContent(
         }
 
         when (tab) {
-            AppScreenTab.Home -> homeScrollToTopRequests.tryEmit(Unit)
+            AppScreenTab.Home, AppScreenTab.Movies, AppScreenTab.Shows -> homeScrollToTopRequests.tryEmit(Unit)
             AppScreenTab.Search -> {
                 searchFocusRequestCount++
                 searchScrollToTopRequests.tryEmit(Unit)
@@ -481,7 +481,7 @@ internal fun MainAppContent(
 
     LaunchedEffect(showLiveTvInNavigation, selectedTab) {
         if (!showLiveTvInNavigation && selectedTab == AppScreenTab.LiveTv) {
-            activateTab(AppScreenTab.Home)
+            activateTab(AppScreenTab.Movies) // Total Eclipse
         }
     }
 
@@ -555,7 +555,8 @@ internal fun MainAppContent(
     // hidden. This effect lives at the app-shell root, which is always active, and stops the hero
     // trailer the instant Home is no longer the visible tab/route, regardless of Home's own state.
     LaunchedEffect(selectedTab, currentRoute) {
-        if (selectedTab != AppScreenTab.Home || currentRoute !is TabsRoute) {
+        // Total Eclipse: Movies / Shows are Home screens too.
+        if (selectedTab !in setOf(AppScreenTab.Home, AppScreenTab.Movies, AppScreenTab.Shows) || currentRoute !is TabsRoute) {
             HomeHeroTrailerPlaybackController.forceStop()
         }
     }
@@ -1672,6 +1673,7 @@ internal fun MainAppContent(
                         actions = { isTabletLayout ->
                             AppTabActions(
                                 onCatalogClick = onCatalogClick,
+                                onSearchClick = { navController.navigate(SearchRoute(title = nativeTabSearchTitle)) },
                                 onPosterClick = navController::openPreview,
                                 onPosterLongClick = { meta ->
                                     openPosterActions(PosterActionTarget(preview = meta))
@@ -1800,8 +1802,8 @@ internal fun MainAppContent(
                             )
                         },
                         onBack = {
-                            if (selectedTab != AppScreenTab.Home) {
-                                activateTab(AppScreenTab.Home)
+                            if (selectedTab != AppScreenTab.Movies) { // Total Eclipse: Movies is the first tab
+                                activateTab(AppScreenTab.Movies)
                             } else {
                                 showExitConfirmation = !showExitConfirmation
                             }
@@ -1945,6 +1947,16 @@ internal fun MainAppContent(
                             onSaved = onBack,
                         )
                     }
+                }
+                // Total Eclipse: Search opens from the Movies / Shows tabs.
+                entry<SearchRoute> {
+                    com.nuvio.app.features.search.SearchScreen(
+                        modifier = Modifier.fillMaxSize(),
+                        listState = searchListState,
+                        onPosterClick = navController::openPreview,
+                        onPosterLongClick = { meta -> openPosterActions(PosterActionTarget(preview = meta)) },
+                        searchFocusRequestCount = 1,
+                    )
                 }
                 entry<DownloadsRoute> { route ->
                     DownloadsDestination(
@@ -2502,6 +2514,7 @@ internal fun MainAppContent(
 private fun AppRoute?.drawsUnderVerticalBar(selectedTab: AppScreenTab): Boolean =
     when (this) {
         is DetailRoute, is StreamRoute, is PlayerRoute -> true
-        is TabsRoute -> selectedTab == AppScreenTab.Home || selectedTab == AppScreenTab.Library
+        is TabsRoute -> selectedTab == AppScreenTab.Home || selectedTab == AppScreenTab.Movies ||
+            selectedTab == AppScreenTab.Shows || selectedTab == AppScreenTab.Library
         else -> false
     }

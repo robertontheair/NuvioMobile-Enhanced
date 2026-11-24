@@ -34,6 +34,7 @@ internal val navigationSavedStateConfiguration = SavedStateConfiguration {
             subclass(MetaScreenSettingsRoute::class, MetaScreenSettingsRoute.serializer())
             subclass(ContinueWatchingSettingsRoute::class, ContinueWatchingSettingsRoute.serializer())
             subclass(DownloadsRoute::class, DownloadsRoute.serializer())
+            subclass(SearchRoute::class, SearchRoute.serializer()) // Total Eclipse
             subclass(DownloadsSettingsRoute::class, DownloadsSettingsRoute.serializer())
             subclass(PartyRoute::class, PartyRoute.serializer())
             subclass(DownloadShowRoute::class, DownloadShowRoute.serializer())

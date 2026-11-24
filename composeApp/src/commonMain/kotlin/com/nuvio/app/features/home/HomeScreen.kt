@@ -134,6 +134,8 @@ fun HomeScreen(
     continueWatchingDisintegrationRequest: DisintegrationRequest<String>? = null,
     onFolderClick: ((collectionId: String, folderId: String) -> Unit)? = null,
     onFirstCatalogRendered: (() -> Unit)? = null,
+    // Total Eclipse: set for the Movies / Shows tabs (see TotalEclipseBrowse).
+    browse: com.nuvio.app.totaleclipse.TotalEclipseBrowseKind? = null,
 ) {
     LaunchedEffect(Unit) {
         AddonRepository.initialize()
@@ -150,7 +152,13 @@ fun HomeScreen(
     val addonSignals by AddonRepository.uiState.collectMappedAsState { state ->
         state.addons.enabledAddons().toHomeAddonSignals()
     }
-    val homeUiState by HomeRepository.uiState.collectAsStateWithLifecycle()
+    val repositoryHomeUiState by HomeRepository.uiState.collectAsStateWithLifecycle()
+    // Total Eclipse: Movies / Shows show their Browse folder's catalogs instead of Home's.
+    val homeUiState = if (browse == null) {
+        repositoryHomeUiState
+    } else {
+        com.nuvio.app.totaleclipse.TotalEclipseBrowse.rememberHomeUiState(browse, repositoryHomeUiState)
+    }
     HomeHeroMetaLoadEffect(homeUiState.heroItems)
     val homeSettingsUiState by remember {
         HomeCatalogSettingsRepository.snapshot()
@@ -574,9 +582,12 @@ fun HomeScreen(
     val (continueWatchingItems, upcomingItems) = remember(
         shuffledContinueWatchingItems,
         continueWatchingPreferences.sortMode,
+        browse,
     ) {
         splitUpcomingItems(
-            items = shuffledContinueWatchingItems,
+            items = browse?.let {
+                com.nuvio.app.totaleclipse.TotalEclipseBrowse.continueWatching(it, shuffledContinueWatchingItems)
+            } ?: shuffledContinueWatchingItems,
             mode = continueWatchingPreferences.sortMode,
         )
     }
@@ -922,8 +933,12 @@ fun HomeScreen(
     val sectionsMap = remember(homeUiState.sections) {
         homeUiState.sections.associateBy(HomeCatalogSection::key)
     }
-    val enabledHomeItems = remember(homeSettingsUiState.items) {
-        homeSettingsUiState.items.filter { it.enabled }
+    val enabledHomeItems = remember(homeSettingsUiState.items, browse, homeUiState.sections) {
+        if (browse != null) {
+            com.nuvio.app.totaleclipse.TotalEclipseBrowse.homeItems(homeUiState)
+        } else {
+            homeSettingsUiState.items.filter { it.enabled }
+        }
     }
     val keyedEnabledHomeItems = remember(enabledHomeItems) {
         enabledHomeItems.withDuplicateSafeLazyKeys(HomeCatalogSettingsItem::key)

@@ -501,11 +501,21 @@ final class TabNavigationCoordinator: ObservableObject {
 
 @available(iOS 16.0, *)
 enum NuvioAppTab: String, CaseIterable, Hashable {
+    // Total Eclipse: Movies and Shows first, like the Apple TVs (see TotalEclipseBrowse.kt).
+    case movies = "Movies"
+    case shows = "Shows"
     case home = "Home"
     case search = "Search"
     case library = "Library"
     case liveTv = "LiveTv"
     case settings = "Settings"
+
+    /// Total Eclipse: the tab the app opens on (and falls back to).
+    static let start: NuvioAppTab = .movies
+
+    /// Total Eclipse: the tab bar, in the Apple TVs' order. Home and Search aren't tabs:
+    /// Movies / Shows replace Home, and Search is a button on them.
+    static let barOrder: [NuvioAppTab] = [.movies, .shows, .liveTv, .library, .settings]
 
     var fallbackTitle: String {
         switch self {
@@ -518,6 +528,8 @@ enum NuvioAppTab: String, CaseIterable, Hashable {
 
     static func from(kotlinName: String?) -> NuvioAppTab? {
         switch kotlinName?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "movies": return .movies
+        case "shows": return .shows
         case "home": return .home
         case "search": return .search
         case "library": return .library
@@ -529,6 +541,8 @@ enum NuvioAppTab: String, CaseIterable, Hashable {
 
     var iconAssetName: String {
         switch self {
+        case .movies: return "TotalEclipseTabMovies"
+        case .shows: return "TotalEclipseTabShows"
         case .home: return "NuvioTabHome"
         case .search: return "NuvioTabSearch"
         case .library: return "NuvioTabLibrary"
@@ -539,6 +553,8 @@ enum NuvioAppTab: String, CaseIterable, Hashable {
 
     var fallbackSystemImage: String {
         switch self {
+        case .movies: return "film"
+        case .shows: return "play.rectangle"
         case .home: return "house.fill"
         case .search: return "magnifyingglass"
         case .library: return "rectangle.stack.fill"
@@ -1006,7 +1022,7 @@ final class AppNavigationCoordinator: ObservableObject {
     private static let nativeTabBarVisibleKey = "NuvioNativeTabBarVisible"
     private static let liveTvTabVisibleKey = "NuvioLiveTvNavigationVisible"
 
-    @Published var selectedTab: NuvioAppTab = .home {
+    @Published var selectedTab: NuvioAppTab = .start {
         didSet {
             if selectedTab != oldValue {
                 setTabBarVisible(true)
@@ -1044,6 +1060,8 @@ final class AppNavigationCoordinator: ObservableObject {
 
     private var tabBarTransitionTask: Task<Void, Never>?
 
+    let moviesCoordinator = TabNavigationCoordinator()
+    let showsCoordinator = TabNavigationCoordinator()
     let homeCoordinator = TabNavigationCoordinator()
     let searchCoordinator = TabNavigationCoordinator()
     let libraryCoordinator = TabNavigationCoordinator()
@@ -1059,7 +1077,8 @@ final class AppNavigationCoordinator: ObservableObject {
         reloadTabBarBehavior()
         reloadLiveTvTabVisibility()
         NativeTabBridgeKt.observeNativePopToRoot { [weak self] tabName in
-            guard let self, let tab = NuvioAppTab.from(kotlinName: tabName) else { return }
+            guard let self, var tab = NuvioAppTab.from(kotlinName: tabName) else { return }
+            if !NuvioAppTab.barOrder.contains(tab) { tab = .start } // Total Eclipse
             self.coordinator(for: tab).popToRoot()
             self.selectedTab = tab
         }
@@ -1085,11 +1104,11 @@ final class AppNavigationCoordinator: ObservableObject {
     }
 
     private var allCoordinators: [TabNavigationCoordinator] {
-        [homeCoordinator, searchCoordinator, libraryCoordinator, liveTvCoordinator, settingsCoordinator]
+        [moviesCoordinator, showsCoordinator, homeCoordinator, searchCoordinator, libraryCoordinator, liveTvCoordinator, settingsCoordinator]
     }
 
     var availableTabs: [NuvioAppTab] {
-        NuvioAppTab.allCases.filter { $0 != .liveTv || isLiveTvTabVisible }
+        NuvioAppTab.barOrder.filter { $0 != .liveTv || isLiveTvTabVisible }
     }
 
     var usesGlassTabBarOverlay: Bool {
@@ -1156,13 +1175,15 @@ final class AppNavigationCoordinator: ObservableObject {
         let visible = UserDefaults.standard.bool(forKey: Self.liveTvTabVisibleKey)
         guard isLiveTvTabVisible != visible else { return }
         if !visible && selectedTab == .liveTv {
-            selectedTab = .home
+            selectedTab = .start
         }
         isLiveTvTabVisible = visible
     }
 
     func coordinator(for tab: NuvioAppTab) -> TabNavigationCoordinator {
         switch tab {
+        case .movies: return moviesCoordinator
+        case .shows: return showsCoordinator
         case .home: return homeCoordinator
         case .search: return searchCoordinator
         case .library: return libraryCoordinator
@@ -1172,12 +1193,14 @@ final class AppNavigationCoordinator: ObservableObject {
     }
 
     func activateTab(named tabName: String) {
-        guard let tab = NuvioAppTab.from(kotlinName: tabName) else { return }
+        guard var tab = NuvioAppTab.from(kotlinName: tabName) else { return }
+        // Total Eclipse: Home and Search aren't in the tab bar; open Movies instead.
+        if !NuvioAppTab.barOrder.contains(tab) { tab = .start }
         guard tab != .liveTv || isLiveTvTabVisible else {
-            selectedTab = .home
+            selectedTab = .start
             return
         }
-        if tab == .home || isAppReady {
+        if tab == .start || isAppReady {
             selectedTab = tab
         }
     }
@@ -1195,6 +1218,8 @@ final class AppNavigationCoordinator: ObservableObject {
         addProfile: String
     ) {
         localizedTabTitles = [
+            .movies: NuvioAppTab.movies.fallbackTitle,
+            .shows: NuvioAppTab.shows.fallbackTitle,
             .home: home,
             .search: search,
             .library: library,
@@ -1210,7 +1235,7 @@ final class AppNavigationCoordinator: ObservableObject {
         if !ready {
             isProfileSwitcherPresented = false
             setTabBarVisible(true)
-            selectedTab = .home
+            selectedTab = .start
             allCoordinators.forEach { $0.popToRoot() }
         }
     }
@@ -1219,7 +1244,7 @@ final class AppNavigationCoordinator: ObservableObject {
         isMainContentMounted = mounted
         if !mounted {
             isMainContentVisible = false
-            selectedTab = .home
+            selectedTab = .start
         }
     }
 
@@ -1251,7 +1276,9 @@ final class AppNavigationCoordinator: ObservableObject {
         let requestedTab = NuvioAppTab.from(kotlinName: route.preferredTabName)
             ?? tab(for: origin)
             ?? selectedTab
-        let targetTab = requestedTab == .liveTv && !isLiveTvTabVisible ? .home : requestedTab
+        // Total Eclipse: only tabs in the bar can hold a route (Home and Search aren't tabs here).
+        let targetTab = (requestedTab == .liveTv && !isLiveTvTabVisible) || !NuvioAppTab.barOrder.contains(requestedTab)
+            ? .start : requestedTab
         let target = coordinator(for: targetTab)
         selectedTab = targetTab
         target.push(route, launchSingleTop: launchSingleTop)
@@ -1929,7 +1956,7 @@ struct NativeNavContentView: View {
                     NativeTabBridgeKt.nativeTabSelect(tabName: newTab.rawValue)
                     return
                 }
-                if appCoordinator.isAppReady || newTab == .home {
+                if appCoordinator.isAppReady || newTab == .start {
                     appCoordinator.selectedTab = newTab
                 }
             }
