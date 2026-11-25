@@ -1523,6 +1523,7 @@ internal fun MainAppContent(
         }
 
         val onLiveTvChannelClick: (LiveTvChannel) -> Unit = { channel ->
+            com.nuvio.app.totaleclipse.TotalEclipseLiveZap.played(channel)
             coroutineScope.launch {
                 val playableChannel = runCatching {
                     LiveTvRepository.prepareForPlayback(channel)
@@ -1546,6 +1547,15 @@ internal fun MainAppContent(
                     ),
                 )
                 navController.navigate(PlayerRoute(launchId = launchId))
+            }
+        }
+
+        // Total Eclipse: channel up/down / Last Channel from the live player.
+        LaunchedEffect(Unit) {
+            if (!ownsAppRuntime) return@LaunchedEffect
+            com.nuvio.app.totaleclipse.TotalEclipseLiveZap.requests.collect { channel ->
+                LiveTvRepository.markChannelWatched(channel)
+                onLiveTvChannelClick(channel)
             }
         }
 

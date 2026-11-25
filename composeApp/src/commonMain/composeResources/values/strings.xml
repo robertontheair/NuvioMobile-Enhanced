@@ -3246,4 +3246,7 @@
     <string name="settings_homescreen_hidden_count">%1$d hidden rows and collections</string>
     <string name="settings_homescreen_no_visible_rows_title">No visible home rows</string>
     <string name="settings_homescreen_no_visible_rows_message">All catalog rows and collections are hidden. Open the hidden section below to restore them.</string>
+    <string name="totaleclipse_toolbar_previous_channel">Previous Channel</string>
+    <string name="totaleclipse_toolbar_next_channel">Next Channel</string>
+    <string name="totaleclipse_toolbar_last_channel">Last Channel</string>
 </resources>

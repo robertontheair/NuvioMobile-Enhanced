@@ -47,7 +47,15 @@ internal fun PlayerDestination(
     // Total Eclipse: tells the player toolbar which title this is, for its Trakt ♥.
     androidx.compose.runtime.CompositionLocalProvider(
         com.nuvio.app.totaleclipse.LocalTotalEclipseDetailTitle provides
-            launch.parentMetaType?.let { type -> launch.parentMetaId?.let { id -> type to id } },
+            launch.parentMetaType?.takeIf { it == "movie" || it == "series" }
+                ?.let { type -> launch.parentMetaId?.let { id -> type to id } },
+        com.nuvio.app.totaleclipse.LocalTotalEclipseLiveZap provides
+            if (launch.contentType == "live") {
+                { channel ->
+                    onBack()
+                    com.nuvio.app.totaleclipse.TotalEclipseLiveZap.request(channel)
+                }
+            } else null,
     ) {
         PlayerScreen(
             profileId = launch.profileId,

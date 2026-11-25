@@ -287,6 +287,7 @@ fun LiveTvScreen(
     }
 
     val playChannel: (LiveTvChannel) -> Unit = { channel ->
+        com.nuvio.app.totaleclipse.TotalEclipseLiveZap.setLineup(visibleChannels)
         LiveTvRepository.markChannelWatched(channel)
         onChannelClick(channel)
     }

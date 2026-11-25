@@ -51,6 +51,9 @@ internal val PlayerToolbarButton.labelRes: StringResource
         PlayerToolbarButton.EPISODES -> Res.string.compose_player_episodes
         PlayerToolbarButton.RATE -> Res.string.user_rating_action_rate
         PlayerToolbarButton.FAVORITE -> Res.string.live_tv_filter_favorites // Total Eclipse: Trakt ♥
+        PlayerToolbarButton.PREVIOUS_CHANNEL -> Res.string.totaleclipse_toolbar_previous_channel
+        PlayerToolbarButton.NEXT_CHANNEL -> Res.string.totaleclipse_toolbar_next_channel
+        PlayerToolbarButton.LAST_CHANNEL -> Res.string.totaleclipse_toolbar_last_channel
         PlayerToolbarButton.EXTERNAL_PLAYER -> Res.string.streams_open_external_player
         PlayerToolbarButton.PLAYBACK_INFO -> Res.string.compose_player_playback_info
         PlayerToolbarButton.SWITCH_ENGINE -> Res.string.cd_switch_player_engine

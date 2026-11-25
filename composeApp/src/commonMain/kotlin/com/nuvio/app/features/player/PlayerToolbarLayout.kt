@@ -1,6 +1,10 @@
 package com.nuvio.app.features.player
 
 enum class PlayerToolbarButton(val storageId: String) {
+    // Total Eclipse: Live TV channel up/down and Last Channel (shown only on live channels).
+    PREVIOUS_CHANNEL("totaleclipse_previous_channel"),
+    NEXT_CHANNEL("totaleclipse_next_channel"),
+    LAST_CHANNEL("totaleclipse_last_channel"),
     NEXT_EPISODE("next_episode"),
     SPEED("speed"),
     RESIZE("resize"),
@@ -55,6 +59,9 @@ data class PlayerToolbarLayout(val entries: List<PlayerToolbarEntry>) {
     companion object {
         val Default = PlayerToolbarLayout(
             listOf(
+                PlayerToolbarButton.PREVIOUS_CHANNEL,
+                PlayerToolbarButton.NEXT_CHANNEL,
+                PlayerToolbarButton.LAST_CHANNEL,
                 PlayerToolbarButton.NEXT_EPISODE,
                 PlayerToolbarButton.SPEED,
                 PlayerToolbarButton.RESIZE,

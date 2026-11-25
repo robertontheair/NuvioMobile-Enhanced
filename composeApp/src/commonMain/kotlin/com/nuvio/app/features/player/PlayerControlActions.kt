@@ -29,6 +29,9 @@ import androidx.compose.material.icons.rounded.Flag
 import androidx.compose.material.icons.rounded.HighQuality
 import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.LockOpen
 import androidx.compose.material.icons.rounded.PictureInPictureAlt
@@ -197,6 +200,28 @@ internal fun PlayerControlActions(
     onInteraction: () -> Unit,
 ) {
     val availableActions = buildMap<PlayerToolbarButton, PlayerControlAction> {
+        // Total Eclipse: Live TV channel up/down and Last Channel.
+        com.nuvio.app.totaleclipse.LocalTotalEclipseLiveZap.current?.let { zap ->
+            val zapper = com.nuvio.app.totaleclipse.TotalEclipseLiveZap
+            zapper.previous()?.let { channel ->
+                this[PlayerToolbarButton.PREVIOUS_CHANNEL] = PlayerControlAction(
+                    "Previous channel: ${channel.name}", { zap(channel) },
+                    icon = Icons.Rounded.KeyboardArrowDown,
+                )
+            }
+            zapper.next()?.let { channel ->
+                this[PlayerToolbarButton.NEXT_CHANNEL] = PlayerControlAction(
+                    "Next channel: ${channel.name}", { zap(channel) },
+                    icon = Icons.Rounded.KeyboardArrowUp,
+                )
+            }
+            zapper.lastChannel()?.let { channel ->
+                this[PlayerToolbarButton.LAST_CHANNEL] = PlayerControlAction(
+                    "Last channel: ${channel.name}", { zap(channel) },
+                    icon = Icons.Rounded.History,
+                )
+            }
+        }
         onNextEpisodeClick?.let {
             this[PlayerToolbarButton.NEXT_EPISODE] = PlayerControlAction(
                 stringResource(Res.string.player_next_episode), it,
