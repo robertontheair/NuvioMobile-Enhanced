@@ -1,13 +1,16 @@
 package com.nuvio.app.features.trakt
 
 import co.touchlab.kermit.Logger
+import com.nuvio.app.core.storage.AppFileCache
 import com.nuvio.app.features.addons.RawHttpResponse
 import com.nuvio.app.features.addons.httpGetTextWithHeaders
 import com.nuvio.app.features.addons.httpRequestRaw
 import com.nuvio.app.features.details.MetaDetails
 import com.nuvio.app.features.details.MetaDetailsRepository
+import com.nuvio.app.features.profiles.ProfileRepository
 import com.nuvio.app.features.tmdb.TmdbService
 import com.nuvio.app.features.watchprogress.ContinueWatchingPreferencesRepository
+import com.nuvio.app.features.watchprogress.WatchProgressCodec
 import com.nuvio.app.features.watchprogress.WatchProgressCompletionPercentThreshold
 import com.nuvio.app.features.watchprogress.WatchProgressEntry
 import com.nuvio.app.features.watchprogress.WatchProgressSourceTraktHistory
@@ -138,6 +141,60 @@ object TraktProgressRepository {
     fun ensureLoaded() {
         if (hasLoaded) return
         hasLoaded = true
+        restoreSavedProgress()
+    }
+
+    // Total Eclipse: the last complete Trakt progress, per profile, so Continue Watching isn't
+    // empty at launch or while Trakt is slow or rate-limited. One writer, so saves stay in order.
+    private val saveDispatcher = Dispatchers.Default.limitedParallelism(1)
+    private var loadGeneration = 0L
+    private var loadedProfileId = 1
+    private var snapshotIsComplete = false
+    private var lastSavedEntries: List<WatchProgressEntry>? = null
+
+    private fun savedProgressPath(profileId: Int) = "totaleclipse/trakt-progress-$profileId.json"
+
+    private fun resetSavedProgressState() {
+        loadGeneration += 1
+        snapshotIsComplete = false
+        lastSavedEntries = null
+    }
+
+    private fun restoreSavedProgress() {
+        val profileId = ProfileRepository.activeProfileId
+        val generation = loadGeneration
+        loadedProfileId = profileId
+        scope.launch(saveDispatcher) {
+            TraktAuthRepository.ensureLoaded(profileId)
+            if (!TraktAuthRepository.isAuthenticated.value) return@launch
+            val entries = runCatching { AppFileCache.read(savedProgressPath(profileId)) }.getOrNull()
+                ?.takeIf(String::isNotBlank)
+                ?.let(WatchProgressCodec::decodeEntries)
+                .orEmpty()
+            if (entries.isEmpty() || generation != loadGeneration) return@launch
+            if (_uiState.value.hasLoadedRemoteProgress) return@launch
+            // Trakt may already have answered with the in-progress titles; the newest of each wins.
+            remoteEntriesSnapshot = mergeNewestByVideoId(entries + remoteEntriesSnapshot)
+            snapshotIsComplete = true
+            // Not marked as loaded from Trakt: Home must not prune anything by this list.
+            publishProgressState(hasLoadedRemoteProgress = false)
+        }
+    }
+
+    private fun saveProgress() {
+        val entries = remoteEntriesSnapshot
+        if (!hasLoaded || entries === lastSavedEntries) return
+        lastSavedEntries = entries
+        val path = savedProgressPath(loadedProfileId)
+        scope.launch(saveDispatcher) {
+            runCatching { AppFileCache.write(path, WatchProgressCodec.encodeEntries(entries)) }
+        }
+    }
+
+    /** Signed out of Trakt, or the profile is gone: the saved list mustn't show for another account. */
+    internal fun forgetSavedProgress(profileId: Int) {
+        if (profileId == loadedProfileId) resetSavedProgressState()
+        scope.launch(saveDispatcher) { runCatching { AppFileCache.write(savedProgressPath(profileId), "") } }
     }
 
     fun isShowHiddenFromProgress(contentId: String): Boolean {
@@ -157,6 +214,7 @@ object TraktProgressRepository {
     fun onProfileChanged() {
         invalidateInFlightRefreshes()
         hasLoaded = false
+        resetSavedProgressState()
         remoteEntriesSnapshot = emptyList()
         optimisticProgress.value = emptyMap()
         hiddenProgressShowIds.value = emptySet()
@@ -169,6 +227,7 @@ object TraktProgressRepository {
     fun clearLocalState() {
         invalidateInFlightRefreshes()
         hasLoaded = false
+        resetSavedProgressState()
         remoteEntriesSnapshot = emptyList()
         optimisticProgress.value = emptyMap()
         hiddenProgressShowIds.value = emptySet()
@@ -450,6 +509,10 @@ object TraktProgressRepository {
             errorMessage = errorMessage,
             hasLoadedRemoteProgress = hasLoadedRemoteProgress,
         )
+        if (hasLoadedRemoteProgress) {
+            snapshotIsComplete = true
+            saveProgress()
+        }
     }
 
     private fun mergeWithActiveOptimistic(entries: List<WatchProgressEntry>): List<WatchProgressEntry> {
@@ -548,6 +611,7 @@ object TraktProgressRepository {
         removeOptimisticProgress { it.videoId == videoId }
         remoteEntriesSnapshot = remoteEntriesSnapshot.filterNot { it.videoId == videoId }
         publishProgressState()
+        if (snapshotIsComplete) saveProgress()
     }
 
     fun applyOptimisticRemoval(
@@ -576,6 +640,7 @@ object TraktProgressRepository {
             )
         }
         publishProgressState()
+        if (snapshotIsComplete) saveProgress()
     }
 
     suspend fun removeProgress(

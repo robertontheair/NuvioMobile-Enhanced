@@ -125,6 +125,7 @@ object TraktAuthRepository : TrackingAuthProvider {
 
     override fun removeStoredProfile(profileId: Int) {
         TraktAuthStorage.removeProfile(profileId)
+        TraktProgressRepository.forgetSavedProgress(profileId)
     }
 
     fun snapshot(profileId: Int = ProfileRepository.activeProfileId): TraktAuthUiState {
@@ -578,6 +579,7 @@ object TraktAuthRepository : TrackingAuthProvider {
 
         authState = TraktAuthState()
         persist(profileId)
+        TraktProgressRepository.forgetSavedProgress(profileId) // Total Eclipse
         publish(
             isLoading = false,
             statusMessage = localizedString(Res.string.trakt_disconnected_status),
