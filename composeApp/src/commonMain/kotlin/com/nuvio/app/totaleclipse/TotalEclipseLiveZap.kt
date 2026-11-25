@@ -53,6 +53,9 @@ internal object TotalEclipseLiveZap {
     fun previous(): LiveTvChannel? = step(-1)
     fun lastChannel(): LiveTvChannel? = last?.takeIf { it.id != currentId }
 
+    /** Set by a live player on screen: switches it in place. */
+    var switchInPlace: ((LiveTvChannel) -> Unit)? = null
+
     fun request(channel: LiveTvChannel) {
         _requests.tryEmit(channel)
     }

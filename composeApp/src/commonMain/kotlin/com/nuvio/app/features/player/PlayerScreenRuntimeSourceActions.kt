@@ -352,6 +352,7 @@ internal fun PlayerScreenRuntime.switchToLiveChannel(channel: LiveTvChannel) {
 }
 
 private fun PlayerScreenRuntime.switchToPreparedLiveChannel(channel: LiveTvChannel) {
+    com.nuvio.app.totaleclipse.TotalEclipseLiveZap.played(channel)
     LiveTvRepository.markChannelWatched(channel)
 
     if (channel.streamUrl == activeSourceUrl) {

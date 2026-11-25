@@ -42,8 +42,10 @@ import kotlinx.serialization.json.put
  */
 internal object HouseholdSync {
     /** The active profile's Live TV favourites and recents logs from the TVs (raw JSON). */
-    @kotlin.concurrent.Volatile var liveLogs: Pair<String?, String?> = null to null
-        private set
+    @kotlin.concurrent.Volatile private var liveLogs: Pair<Int, Pair<String?, String?>>? = null
+
+    /** The logs for phone profile [slot], or null when they're another profile's (or not read yet). */
+    fun liveLogsFor(slot: Int): Pair<String?, String?>? = liveLogs?.takeIf { it.first == slot }?.second
 
     private const val TAG = "TotalEclipse/Household"
 
@@ -100,6 +102,11 @@ internal object HouseholdSync {
 
     /** The active profile changed: bring its add-ons, keys and collections in line with the TVs. */
     fun onProfileSelected() {
+        if (liveLogs?.first != ProfileRepository.activeProfileId) {
+            liveLogs = null
+            TotalEclipseLiveLayout.update(null) // the last profile's layout; this one's is read by the sync
+        }
+        com.nuvio.app.features.livetv.LiveTvRepository.onProfileChanged()
         if (started) sync("profile selected")
     }
 
@@ -218,6 +225,9 @@ internal object HouseholdSync {
 
         applyPlayerSettings(slot, tvId, reason)
 
+        // Another profile was chosen while this one was being read: its own sync follows.
+        if (ProfileRepository.activeProfileId != slot) return
+
         // Live TV favourites and Recently Watched: the TVs' dated logs, merged into the phone's.
         val profileSettings = HouseholdCloudStore.stringSettings(TV_PROFILE_SETTINGS_PREFIX + tvId)
         val logs = profileSettings[TotalEclipseLiveSync.TV_FAVORITES_LOG] to profileSettings[TotalEclipseLiveSync.TV_RECENTS_LOG]
@@ -228,8 +238,8 @@ internal object HouseholdSync {
             InAppLogger.info(TAG, "$reason: Live TV layout from TV '$tvId' (${layoutText?.length ?: 0} chars)")
             com.nuvio.app.features.livetv.LiveTvRepository.reapplyLayout()
         }
-        if (logs != liveLogs) {
-            liveLogs = logs
+        if (logs != liveLogsFor(slot)) {
+            liveLogs = slot to logs
             if (com.nuvio.app.features.livetv.LiveTvRepository.uiState.value.channels.isNotEmpty()) {
                 com.nuvio.app.features.livetv.LiveTvRepository.applyHouseholdLiveLogs(logs.first, logs.second)
             }

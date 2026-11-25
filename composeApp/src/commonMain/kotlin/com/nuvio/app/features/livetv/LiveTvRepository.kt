@@ -41,6 +41,7 @@ object LiveTvRepository {
     fun ensureLoaded() {
         if (hasLoaded) return
         hasLoaded = true
+        loadedProfileId = com.nuvio.app.features.profiles.ProfileRepository.activeProfileId
         val playlists = loadSavedPlaylists()
         _uiState.value = LiveTvUiState(
             playlistUrl = playlists.firstEnabledUrlSource(),
@@ -56,6 +57,36 @@ object LiveTvRepository {
             isEpgAutoDetectEnabled = LiveTvStorage.loadEpgAutoDetectEnabled() ?: true,
         )
         publishNavigationVisibility()
+    }
+
+    /** Total Eclipse: whose favourites, recents and playlists are loaded. */
+    private var loadedProfileId: Int? = null
+
+    /**
+     * Total Eclipse: another profile was chosen. Everything here is stored per profile; without
+     * this the first profile's favourites stayed and were merged into the second's.
+     */
+    fun onProfileChanged() {
+        if (!hasLoaded || loadedProfileId == com.nuvio.app.features.profiles.ProfileRepository.activeProfileId) return
+        val reload = channelsRequested
+        refreshJob?.cancel()
+        epgJob?.cancel()
+        hasLoaded = false
+        channelsRequested = false
+        channelsSignature = null
+        rawChannels = emptyList()
+        restoredEpg = null
+        detectedEpgUrls = emptyList()
+        ensureLoaded()
+        if (reload) ensureChannelsLoaded()
+    }
+
+    /** Total Eclipse: merges the TVs' favourites and recents when they're this profile's. */
+    private fun mergeHouseholdLogs() {
+        val slot = com.nuvio.app.features.profiles.ProfileRepository.activeProfileId
+        if (slot != loadedProfileId) return
+        val logs = com.nuvio.app.totaleclipse.HouseholdSync.liveLogsFor(slot)
+        applyHouseholdLiveLogs(logs?.first, logs?.second)
     }
 
     /** Total Eclipse: the channels as loaded, before the TVs' layout is applied. */
@@ -88,6 +119,7 @@ object LiveTvRepository {
                     isLoading = false,
                     errorMessage = null,
                 )
+                mergeHouseholdLogs() // Total Eclipse
                 refreshEpg(force = false)
                 return@launch
             }
@@ -432,9 +464,7 @@ object LiveTvRepository {
                 channelsSignature = signature
                 if (fetchedChannels.isNotEmpty()) {
                     // Total Eclipse: move old ids to the TVs' keys and merge the TVs' favourites/recents.
-                    com.nuvio.app.totaleclipse.HouseholdSync.liveLogs.let { (fav, recent) ->
-                        applyHouseholdLiveLogs(fav, recent)
-                    }
+                    mergeHouseholdLogs()
                     val epgUrls = detectedEpgUrls
                     val savedAt = Clock.System.now().toEpochMilliseconds()
                     withContext(Dispatchers.Default) {
@@ -659,6 +689,7 @@ object LiveTvRepository {
      */
     fun applyHouseholdLiveLogs(tvFavoritesLog: String?, tvRecentsLog: String?) {
         ensureLoaded()
+        if (loadedProfileId != com.nuvio.app.features.profiles.ProfileRepository.activeProfileId) return
         val sync = com.nuvio.app.totaleclipse.TotalEclipseLiveSync
         val legacy = sync.legacyIds
         val state = _uiState.value

@@ -52,8 +52,13 @@ internal fun PlayerDestination(
         com.nuvio.app.totaleclipse.LocalTotalEclipseLiveZap provides
             if (launch.contentType == "live") {
                 { channel ->
-                    onBack()
-                    com.nuvio.app.totaleclipse.TotalEclipseLiveZap.request(channel)
+                    val inPlace = com.nuvio.app.totaleclipse.TotalEclipseLiveZap.switchInPlace
+                    if (inPlace != null) {
+                        inPlace(channel)
+                    } else {
+                        onBack()
+                        com.nuvio.app.totaleclipse.TotalEclipseLiveZap.request(channel)
+                    }
                 }
             } else null,
     ) {

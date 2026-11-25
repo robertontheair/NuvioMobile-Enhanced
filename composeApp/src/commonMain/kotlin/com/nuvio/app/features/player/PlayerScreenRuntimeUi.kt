@@ -836,6 +836,16 @@ private fun BoxScope.RenderPlaybackOverlays(
                 delay(1_000L)
             }
         }
+        // Total Eclipse: channel up/down and Last Channel switch this player in place.
+        DisposableEffect(isLiveTvPlayback) {
+            val handler: (com.nuvio.app.features.livetv.LiveTvChannel) -> Unit = { switchToLiveChannel(it) }
+            if (isLiveTvPlayback) com.nuvio.app.totaleclipse.TotalEclipseLiveZap.switchInPlace = handler
+            onDispose {
+                if (com.nuvio.app.totaleclipse.TotalEclipseLiveZap.switchInPlace === handler) {
+                    com.nuvio.app.totaleclipse.TotalEclipseLiveZap.switchInPlace = null
+                }
+            }
+        }
         // Total Eclipse: on Live TV, a failure from a dead channel (the provider sends a web page)
         // reads as "isn't broadcasting right now" instead of the player's technical message.
         val liveErrorMessage by produceState<String?>(null, errorMessage, isLiveTvPlayback) {
@@ -843,7 +853,7 @@ private fun BoxScope.RenderPlaybackOverlays(
             if (raw == null || !isLiveTvPlayback) { value = raw; return@produceState }
             value = null
             val dead = com.nuvio.app.totaleclipse.TotalEclipseLiveProbe.looksDead(activeSourceUrl, activeSourceHeaders)
-            value = if (dead) com.nuvio.app.totaleclipse.TotalEclipseLiveProbe.message(title) else raw
+            value = if (dead) com.nuvio.app.totaleclipse.TotalEclipseLiveProbe.message(activeStreamTitle.ifBlank { title }) else raw
         }
         PlayerPlaybackOverlays(
             playerControlsLocked = playerControlsLocked,
