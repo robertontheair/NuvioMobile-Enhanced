@@ -78,8 +78,15 @@ object NetworkStatusRepository {
         requestRefresh(force = true)
     }
 
+    private var lastForegroundRefresh: kotlin.time.TimeSource.Monotonic.ValueTimeMark? = null
+
     fun requestForegroundRefresh() {
         ensureStarted()
+        // Total Eclipse: Control Center and Notification Center also count as "back in the app";
+        // check at most once a minute.
+        val last = lastForegroundRefresh
+        if (last != null && last.elapsedNow().inWholeSeconds < 60) return
+        lastForegroundRefresh = kotlin.time.TimeSource.Monotonic.markNow()
         foregroundRefreshJob?.cancel()
         foregroundRefreshJob = scope.launch {
             delay(FOREGROUND_REFRESH_DELAY_MS)

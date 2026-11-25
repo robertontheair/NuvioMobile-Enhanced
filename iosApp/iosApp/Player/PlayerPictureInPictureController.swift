@@ -148,15 +148,29 @@ final class PlayerPictureInPictureController: NSObject,
         }
     }
 
+    private var lastReportedRate: Double = -1
+    private var lastReportedDurationMs: Int64 = -1
+    /// Total Eclipse: how often a frame is kept ready while Picture in Picture is off (it needs
+    /// one to start). Every 5 s normally; at once when the app is about to leave the screen.
+    private static let primeInterval: TimeInterval = 5
+    private var primeSoon = false
+
+    func primeNextFrame() {
+        frameLock.lock()
+        primeSoon = true
+        frameLock.unlock()
+    }
+
     func submit(_ buffer: CVPixelBuffer, pts: Double, isPictureInPictureFrame: Bool, doviMetadata: Data?) {
         frameLock.lock()
         guard acceptingFrames else { frameLock.unlock(); return }
         let now = ProcessInfo.processInfo.systemUptime
-        if !isPictureInPictureFrame && !feedingRestoreTransition && now - lastPrimeTime < 0.5 {
+        if !isPictureInPictureFrame && !feedingRestoreTransition && !primeSoon && now - lastPrimeTime < Self.primeInterval {
             frameLock.unlock()
             return
         }
         lastPrimeTime = now
+        primeSoon = false
         pendingFrame = (buffer, pts, isPictureInPictureFrame, doviMetadata)
         let schedule = !drainScheduled
         drainScheduled = true
@@ -232,7 +246,7 @@ final class PlayerPictureInPictureController: NSObject,
         frameLock.unlock()
     }
 
-    func updatePlaybackState() {
+    func updatePlaybackState(force: Bool = true) {
         if waitingForInlinePresentation,
            owner?.isPlayerPlaying != true || owner?.isPlayerLoading == true {
             cancelInlinePresentationWait()
@@ -244,7 +258,13 @@ final class PlayerPictureInPictureController: NSObject,
         if !now.isFinite || abs(now - position) > 0.25 {
             CMTimebaseSetTime(timebase, time: CMTime(seconds: position, preferredTimescale: 60000))
         }
-        CMTimebaseSetRate(timebase, rate: owner.isPlayerPlaying ? Double(owner.currentSpeed) : 0)
+        let rate = owner.isPlayerPlaying ? Double(owner.currentSpeed) : 0
+        let jumped = !now.isFinite || abs(now - position) > 0.25
+        // Total Eclipse: called four times a second; only tell iOS when something changed.
+        guard force || jumped || rate != lastReportedRate || owner.durationMs != lastReportedDurationMs else { return }
+        lastReportedRate = rate
+        lastReportedDurationMs = owner.durationMs
+        CMTimebaseSetRate(timebase, rate: rate)
         controller?.invalidatePlaybackState()
     }
 

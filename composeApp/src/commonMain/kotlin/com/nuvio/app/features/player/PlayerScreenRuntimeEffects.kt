@@ -58,7 +58,7 @@ private const val SKIP_INTERVAL_RESOLVE_TIMEOUT_MS = 4_000L
  * Coarse view of the playback snapshot. The engine publishes a snapshot every 250ms, while the
  * effects below only care about the state flags and about the position at second granularity.
  */
-private data class PlayerSnapshotSignals(
+internal data class PlayerSnapshotSignals(
     val isPlaying: Boolean,
     val isLoading: Boolean,
     val isEnded: Boolean,
@@ -79,8 +79,26 @@ private fun rememberNetworkCondition(): NetworkCondition {
     return uiState.condition
 }
 
+/** Total Eclipse: playback state that changes only when it really changes. */
+@Composable
+internal fun PlayerScreenRuntime.rememberPlayerSnapshotSignals() = remember(this) {
+    derivedStateOf {
+        val snapshot = playbackSnapshot
+        PlayerSnapshotSignals(
+            isPlaying = snapshot.isPlaying,
+            isLoading = snapshot.isLoading,
+            isEnded = snapshot.isEnded,
+            durationMs = snapshot.durationMs,
+            positionSeconds = snapshot.positionMs / 1000L,
+        )
+    }
+}
+
 @Composable
 internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
+    // Total Eclipse: the snapshot changes four times a second; effects and composition read
+    // these, which change only when the values do (position by the second).
+    val tick by rememberPlayerSnapshotSignals()
     val networkCondition = rememberNetworkCondition()
     val currentFeedback = liveGestureFeedback ?: gestureFeedback
     LaunchedEffect(currentFeedback) {
@@ -365,14 +383,14 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
         applyPreferredServerAudioTrack()
     }
 
-    LaunchedEffect(playbackSnapshot.isLoading, playerController, preferredAudioLanguageTargets) {
+    LaunchedEffect(tick.isLoading, playerController, preferredAudioLanguageTargets) {
         if (!playbackSnapshot.isLoading && playerController != null) {
             refreshTracks()
         }
     }
 
     LaunchedEffect(
-        playbackSnapshot.isLoading,
+        tick.isLoading,
         playerController,
         playerControllerSourceUrl,
         activeSourceUrl,
@@ -382,13 +400,14 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
         if (!playbackSnapshot.isLoading) loadChaptersIfNeeded()
     }
 
-    LaunchedEffect(playbackSnapshot.chapters, chapters, playerSettingsUiState.androidExoChaptersEnabled) {
+    val snapshotChapters by remember(this) { derivedStateOf { playbackSnapshot.chapters } }
+    LaunchedEffect(snapshotChapters, chapters, playerSettingsUiState.androidExoChaptersEnabled) {
         adoptSnapshotChaptersIfNeeded()
     }
 
     LaunchedEffect(
         playerController,
-        playbackSnapshot.isLoading,
+        tick.isLoading,
         preferredAudioSelectionApplied,
         preferredSubtitleSelectionApplied,
         trackPreferenceRestoreApplied,
@@ -435,8 +454,8 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
         activeSourceUrl,
         activePlaybackSourceUrl,
         p2pResolvedSourceUrl,
-        playbackSnapshot.isLoading,
-        playbackSnapshot.durationMs,
+        tick.isLoading,
+        tick.durationMs,
         activeInitialPositionMs,
         activeInitialProgressFraction,
         initialSeekApplied,
@@ -638,6 +657,9 @@ private fun PlayerScreenRuntime.BindPlayerUiVisibilityEffects() {
 @Composable
 private fun PlayerScreenRuntime.BindPlayerMetadataAndSkipEffects() {
     val networkCondition = rememberNetworkCondition()
+    // Total Eclipse: the snapshot changes four times a second; effects and composition read
+    // these, which change only when the values do (position by the second).
+    val tick by rememberPlayerSnapshotSignals()
     val shuffleProfile by remember {
         EpisodeShuffleRepository.ensureLoaded()
         EpisodeShuffleRepository.uiState
@@ -675,7 +697,7 @@ private fun PlayerScreenRuntime.BindPlayerMetadataAndSkipEffects() {
         }
     }
 
-    LaunchedEffect(playbackSnapshot.isPlaying, parentalWarnings) {
+    LaunchedEffect(tick.isPlaying, parentalWarnings) {
         if (playbackSnapshot.isPlaying) {
             tryShowParentalGuide()
         }
@@ -740,7 +762,7 @@ private fun PlayerScreenRuntime.BindPlayerMetadataAndSkipEffects() {
     }
 
     LaunchedEffect(
-        playbackSnapshot.positionMs, playbackSnapshot.durationMs, playbackSnapshot.isPlaying, skipIntervals,
+        tick.positionSeconds, tick.durationMs, tick.isPlaying, skipIntervals,
         playerSettingsUiState.autoSkipSegmentTypes,
         playerSettingsUiState.skipIntroEnabled, isScrubbingTimeline, initialSeekApplied,
         lastManualSkipSeekPositions,
@@ -884,7 +906,7 @@ private fun PlayerScreenRuntime.BindPlayerMetadataAndSkipEffects() {
         } else null
     }
 
-    LaunchedEffect(playbackSnapshot.isEnded) {
+    LaunchedEffect(tick.isEnded) {
         if (playbackSnapshot.isEnded && nextEpisodeCardDismissed &&
             playerSettingsUiState.streamAutoPlayNextEpisodeEnabled &&
             nextEpisodeInfo?.hasAired == true
@@ -895,7 +917,7 @@ private fun PlayerScreenRuntime.BindPlayerMetadataAndSkipEffects() {
 
     LaunchedEffect(
         activePlaybackKey,
-        playbackSnapshot,
+        tick,
         playbackSnapshotKey,
         initialSeekApplied,
         isScrubbingTimeline,
@@ -942,9 +964,9 @@ private fun PlayerScreenRuntime.BindPlayerMetadataAndSkipEffects() {
     }
 
     LaunchedEffect(
-        playbackSnapshot.positionMs,
-        playbackSnapshot.durationMs,
-        playbackSnapshot.isEnded,
+        tick.positionSeconds,
+        tick.durationMs,
+        tick.isEnded,
         playerMeta?.moreLikeThis,
         playerMoreLikeThis,
         watchedUiState.watchedKeys,

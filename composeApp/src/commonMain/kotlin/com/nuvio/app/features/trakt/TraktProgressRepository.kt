@@ -56,7 +56,8 @@ private const val MAX_RECENT_EPISODE_HISTORY_ENTRIES = 300
 private const val METADATA_FETCH_TIMEOUT_MS = 3_500L
 private const val METADATA_FETCH_CONCURRENCY = 5
 private const val METADATA_HYDRATION_LIMIT = 110
-private const val REFRESH_BASE_INTERVAL_MS = 60L * 1000L
+// Total Eclipse: every 5 minutes while the app is open (was every minute), and on returning to it.
+private const val REFRESH_BASE_INTERVAL_MS = 5L * 60L * 1000L
 private const val EPISODE_PROGRESS_CACHE_TTL_MS = 30L * 60L * 1000L
 private const val EPISODE_PROGRESS_FETCH_THROTTLE_MS = 60L * 1000L
 private const val OPTIMISTIC_PROGRESS_TTL_MS = 3L * 60L * 1000L
@@ -116,6 +117,7 @@ object TraktProgressRepository {
         scope.launch {
             while (true) {
                 delay(refreshIntervalMs)
+                if (!appInForeground) continue
                 TraktAuthRepository.ensureLoaded()
                 TraktSettingsRepository.ensureLoaded()
                 if (!shouldUseTraktProgress(
@@ -364,6 +366,26 @@ object TraktProgressRepository {
         val changed = fingerprint != lastKnownActivityFingerprint
         lastKnownActivityFingerprint = fingerprint
         return changed
+    }
+
+    @kotlin.concurrent.Volatile private var appInForeground = true
+    private var lastForegroundCheck: kotlin.time.TimeSource.Monotonic.ValueTimeMark? = null
+
+    /** Total Eclipse: the app came back on screen (or left it). Checks Trakt at most once a minute. */
+    fun onAppForeground(foreground: Boolean) {
+        appInForeground = foreground
+        if (!foreground) return
+        val last = lastForegroundCheck
+        if (last != null && last.elapsedNow().inWholeSeconds < 60) return
+        lastForegroundCheck = kotlin.time.TimeSource.Monotonic.markNow()
+        scope.launch {
+            if (!shouldUseTraktProgress(
+                    isAuthenticated = TraktAuthRepository.isAuthenticated.value,
+                    source = TraktSettingsRepository.uiState.value.watchProgressSource,
+                )
+            ) return@launch
+            runCatching { refreshIfActivityChanged() }.onFailure { if (it is CancellationException) throw it }
+        }
     }
 
     private fun resetRefreshInterval() {

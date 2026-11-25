@@ -789,6 +789,7 @@ internal fun MainAppContent(
                     AppVisibility.Foreground -> {
                         InAppLogger.debug("App/Foreground", "foreground event: refreshing network status")
                         NetworkStatusRepository.requestForegroundRefresh()
+                        com.nuvio.app.features.trakt.TraktProgressRepository.onAppForeground(true)
                         DeviceSessionRegistration.registerIfAuthenticated()
                         MemberAccessRepository.refreshIfStale()
                         refreshLibraryReleaseScheduleIfStale()
@@ -801,6 +802,7 @@ internal fun MainAppContent(
                         }
                     }
                     AppVisibility.Background -> {
+                        com.nuvio.app.features.trakt.TraktProgressRepository.onAppForeground(false)
                         SyncManager.stopPeriodicNuvioSyncPull()
                         WatchProgressRepository.flushPendingWrites()
                     }

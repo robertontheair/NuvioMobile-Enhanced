@@ -23,6 +23,8 @@ interface NuvioPlayerBridge {
     fun getKeepsPlaybackInBackground(): Boolean
     fun retry()
     fun isPictureInPictureSupported(): Boolean
+    /** Total Eclipse: changes whenever the track lists change. */
+    fun getTracksGeneration(): Long
     fun startPictureInPicture()
     fun setVideoZoom(scale: Double)
     fun setExperimentalSinglePrimaryPictureInPictureEnabled(enabled: Boolean)

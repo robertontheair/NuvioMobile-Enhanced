@@ -497,7 +497,8 @@ private fun PlayerScreenRuntime.RenderPlayerControls(
     LaunchedEffect(seekPreview, seekPreviewHasDuration) {
         if (seekPreviewHasDuration) seekPreview?.warmUpFeed(playbackSnapshot.positionMs, playbackSnapshot.durationMs)
     }
-    LaunchedEffect(seekPreview, playbackSnapshot.isLoading) {
+    val snapshotLoading by remember(this) { derivedStateOf { playbackSnapshot.isLoading } }
+    LaunchedEffect(seekPreview, snapshotLoading) {
         seekPreview?.playbackBuffering = playbackSnapshot.isLoading
     }
     val userRatingTarget = currentUserRatingTarget()
@@ -1038,11 +1039,15 @@ private fun PlayerScreenRuntime.RenderPlayerModals() {
         Snapshot.withoutReadObservation { scrubbingPositionMs ?: playbackSnapshot.positionMs }
     }
     val snapshotMediaInfoJson by remember(this) { derivedStateOf { playbackSnapshot.mediaInfoJson } }
+    val snapshotDuration by remember(this) { derivedStateOf { playbackSnapshot.durationMs } }
+    val snapshotDiscTitles by remember(this) { derivedStateOf { playbackSnapshot.discTitles } }
+    val snapshotDiscIndex by remember(this) { derivedStateOf { playbackSnapshot.activeDiscTitleIndex } }
+    val snapshotAnime by remember(this) { derivedStateOf { playbackSnapshot.animeEnhancement } }
     PlayerChaptersPanel(
         visible = showChaptersPanel && chapters.isNotEmpty(),
         chapters = chapters,
         positionMs = displayedPositionMs,
-        durationMs = playbackSnapshot.durationMs,
+        durationMs = snapshotDuration,
         onChapterSelected = { selectChapter(it) },
         onDismiss = {
             showChaptersPanel = false
@@ -1050,9 +1055,9 @@ private fun PlayerScreenRuntime.RenderPlayerModals() {
         },
     )
     PlayerDiscTitlesPanel(
-        visible = showDiscTitlesPanel && playbackSnapshot.discTitles.size > 1,
-        titles = playbackSnapshot.discTitles,
-        activeIndex = playbackSnapshot.activeDiscTitleIndex,
+        visible = showDiscTitlesPanel && snapshotDiscTitles.size > 1,
+        titles = snapshotDiscTitles,
+        activeIndex = snapshotDiscIndex,
         onTitleSelected = { selectDiscTitle(it) },
         onDismiss = {
             showDiscTitlesPanel = false
@@ -1157,7 +1162,7 @@ private fun PlayerScreenRuntime.RenderPlayerModals() {
             playerController?.configureIosVideoOutput(PlayerSettingsRepository.uiState.value)
         },
         onVideoSettingsModalDismissed = { showVideoSettingsModal = false },
-        animeEnhancementStatus = playbackSnapshot.animeEnhancement,
+        animeEnhancementStatus = snapshotAnime,
         showSourcesPanel = showSourcesPanel,
         sourceStreamsState = sourceStreamsState,
         contentTitle = title,

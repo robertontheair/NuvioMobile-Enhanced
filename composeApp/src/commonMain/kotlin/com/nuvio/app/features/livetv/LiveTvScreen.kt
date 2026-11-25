@@ -211,7 +211,8 @@ fun LiveTvScreen(
         categoryOptions,
         onNowFilter,
         uiState.epgPrograms,
-        guideShownMillis / 60_000L,
+        // Total Eclipse: the clock matters only to On Now filters.
+        if (onNowFilter != null) guideShownMillis / 60_000L else 0L,
     ) {
         val filtered = filterLiveTvChannels(
             channels = uiState.channels,
@@ -237,10 +238,19 @@ fun LiveTvScreen(
         else liveTvOnNow(filtered, uiState.epgPrograms, onNowFilter, guideShownMillis, uiState.favoriteChannelIds + uiState.recentChannelIds)
     }
     // Total Eclipse: On Now chips that have channels right now (at the time the guide shows).
-    val onNowCounts = remember(uiState.channels, uiState.epgPrograms, guideShownMillis / 60_000L, uiState.favoriteChannelIds, uiState.recentChannelIds) {
+    // Worked out away from the main thread: five passes over every channel's programmes.
+    val onNowCounts by androidx.compose.runtime.produceState(
+        emptyMap<LiveTvOnNowFilter, Int>(),
+        uiState.channels, uiState.epgPrograms, guideShownMillis / 60_000L, uiState.favoriteChannelIds, uiState.recentChannelIds,
+    ) {
+        val channels = uiState.channels
+        val programs = uiState.epgPrograms
+        val at = guideShownMillis
         val watched = uiState.favoriteChannelIds + uiState.recentChannelIds
-        LiveTvOnNowFilter.entries.associateWith { liveTvOnNow(uiState.channels, uiState.epgPrograms, it, guideShownMillis, watched).size }
-            .filterValues { it > 0 }
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            LiveTvOnNowFilter.entries.associateWith { liveTvOnNow(channels, programs, it, at, watched).size }
+                .filterValues { it > 0 }
+        }
     }
 
     val lastWatchedChannel = remember(uiState.channels, uiState.lastWatchedChannelId) {
@@ -362,8 +372,9 @@ fun LiveTvScreen(
     }
 
     // Sports -----------------------------------------------------------------------------------
-    LaunchedEffect(section) {
-        if (section != LiveTvSection.Sports) return@LaunchedEffect
+    // Total Eclipse: only while Live TV is on screen.
+    com.nuvio.app.core.ui.ScreenActivityEffect(section) { active ->
+        if (!active || section != LiveTvSection.Sports) return@ScreenActivityEffect
         while (true) {
             LiveTvSportsRepository.refreshIfStale()
             delay(30_000L)
@@ -1825,7 +1836,7 @@ private fun filterLiveTvChannels(
     return if (filterMode == LiveTvChannelFilterMode.Recents) {
         filtered.sortedBy { recentOrder[it.id] ?: Int.MAX_VALUE }.toList()
     } else {
-        filtered.sortedBy { it.name.lowercase() }.toList()
+        filtered.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name }).toList()
     }
 }
 

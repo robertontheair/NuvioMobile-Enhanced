@@ -123,5 +123,6 @@ internal fun liveTvOnNow(
             filter == LiveTvOnNowFilter.Sports || channel.id in watched -> later += channel
         }
     }
-    return first.sortedBy { it.name.lowercase() } + later.sortedBy { it.name.lowercase() }
+    val byName = compareBy(String.CASE_INSENSITIVE_ORDER) { channel: LiveTvChannel -> channel.name }
+    return first.sortedWith(byName) + later.sortedWith(byName)
 }

@@ -156,6 +156,7 @@ final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
     }
 
     // Audio tracks
+    func getTracksGeneration() -> Int64 { playerVC?.tracksGeneration ?? -1 }
     func getAudioTrackCount() -> Int32 { Int32(playerVC?.audioTracks.count ?? 0) }
     func getAudioTrackIndex(at: Int32) -> Int32 {
         guard let t = playerVC?.audioTracks, Int(at) < t.count else { return 0 }
@@ -417,7 +418,9 @@ final class MPVPlayerViewController: UIViewController {
     private var positionSampleTime: CFTimeInterval = 0
     private var positionSampleRate: Double = 0
 
-    private static let mediaInfoRefreshInterval: CFTimeInterval = 1.0
+    // Total Eclipse: every second until the video's size is known, then every 5 seconds
+    // (it's only shown in the info panel).
+    private var mediaInfoRefreshInterval: CFTimeInterval { cachedVideoWidth > 0 ? 5.0 : 1.0 }
     private let mediaInfoLock = NSLock()
     private var cachedMediaInfoJson = "{}"
     private var cachedVideoWidth = 0
@@ -504,6 +507,8 @@ final class MPVPlayerViewController: UIViewController {
     private var throttledLogEntries: [String: ThrottledLogEntry] = [:]
 
     var audioTracks: [TrackInfo] = []
+    /// Total Eclipse: bumped whenever the track lists are replaced, so callers can keep theirs.
+    private(set) var tracksGeneration: Int64 = 0
     var subtitleTracks: [TrackInfo] = []
     var isPlayerLoading: Bool = true
     var isPlayerPlaying: Bool = false
@@ -1071,6 +1076,7 @@ final class MPVPlayerViewController: UIViewController {
     }
 
     @objc private func willResignActive() {
+        pictureInPictureController?.primeNextFrame()   // Total Eclipse: fresh frame for Picture in Picture
         guard mpv != nil else { return }
         let coreGeneration = mpvGeneration
         mpvQueue.async { [weak self] in
@@ -2171,7 +2177,7 @@ final class MPVPlayerViewController: UIViewController {
         let now = CACurrentMediaTime()
         mediaInfoLock.lock()
         let shouldRefresh = !isMediaInfoRefreshInFlight &&
-            (now - lastMediaInfoRefreshTime) >= Self.mediaInfoRefreshInterval
+            (now - lastMediaInfoRefreshTime) >= mediaInfoRefreshInterval
         if shouldRefresh {
             isMediaInfoRefreshInFlight = true
             lastMediaInfoRefreshTime = now
@@ -2415,7 +2421,7 @@ final class MPVPlayerViewController: UIViewController {
 
     private func syncNowPlayingPlaybackState(isPlaying: Bool, force: Bool = false) {
         let start = CACurrentMediaTime()
-        pictureInPictureController?.updatePlaybackState()
+        pictureInPictureController?.updatePlaybackState(force: false)
         nowPlayingController.syncPlayback(
             positionMs: positionMs,
             durationMs: durationMs,
@@ -2461,6 +2467,7 @@ final class MPVPlayerViewController: UIViewController {
             guard let tracks else { return }
             DispatchQueue.main.async {
                 self.audioTracks = tracks.audio
+                self.tracksGeneration &+= 1
                 self.subtitleTracks = tracks.subtitles
             }
         }

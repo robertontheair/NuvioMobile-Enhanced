@@ -214,7 +214,7 @@ internal fun PlayerScreenContent(args: PlayerScreenArgs) {
             initialValue = false,
             runtime.playerController,
             runtime.activeSourceUrl,
-            runtime.playbackSnapshot.isLoading,
+            runtime.rememberPlayerSnapshotSignals().value.isLoading,
         ) {
             val controller = runtime.playerController
             value = if (controller == null || runtime.playbackSnapshot.isLoading) {
