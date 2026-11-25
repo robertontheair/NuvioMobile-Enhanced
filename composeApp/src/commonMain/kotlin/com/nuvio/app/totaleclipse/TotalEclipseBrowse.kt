@@ -5,6 +5,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.collection.Collection
 import com.nuvio.app.features.collection.CollectionRepository
 import com.nuvio.app.features.collection.FolderDetailStore
@@ -13,6 +14,7 @@ import com.nuvio.app.features.home.HomeCatalogSection
 import com.nuvio.app.features.home.HomeCatalogSettingsItem
 import com.nuvio.app.features.home.HomeUiState
 import com.nuvio.app.features.home.MetaPreview
+import com.nuvio.app.features.profiles.ProfileRepository
 import com.nuvio.app.features.watchprogress.ContinueWatchingItem
 
 /**
@@ -36,6 +38,9 @@ enum class TotalEclipseBrowseKind(val contentTypes: Set<String>, private val tit
 
 internal object TotalEclipseBrowse {
     private val stores = mutableMapOf<TotalEclipseBrowseKind, FolderDetailStore>()
+    /** What each tab was last opened for: the profile and the folder as it was. */
+    private val opened = mutableMapOf<TotalEclipseBrowseKind, Pair<Int?, Any?>>()
+    private val personalFor = mutableMapOf<TotalEclipseBrowseKind, Int?>()
 
     private fun store(kind: TotalEclipseBrowseKind): FolderDetailStore =
         stores.getOrPut(kind) { FolderDetailStore() }
@@ -56,13 +61,38 @@ internal object TotalEclipseBrowse {
         val collections by CollectionRepository.collections.collectAsStateWithLifecycle()
         val target = remember(collections, kind) { findFolder(collections, kind) }
         val store = remember(kind) { store(kind) }
-        LaunchedEffect(target) {
+        // The folder's rows are resolved once, when it's opened, so they're opened again when the
+        // profile or the folder itself changes (both profiles use the same ids), and when add-ons
+        // that weren't loaded yet arrive: a row whose add-on was missing never tried again.
+        val profiles by ProfileRepository.state.collectAsStateWithLifecycle()
+        val profileIndex = profiles.activeProfile?.profileIndex
+        val folder = remember(collections, target) {
+            target?.let { (c, f) -> collections.firstOrNull { it.id == c }?.folders?.firstOrNull { it.id == f } }
+        }
+        val addonState by AddonRepository.uiState.collectAsStateWithLifecycle()
+        val readyAddons = remember(addonState) {
+            addonState.addons.filter { it.isActive }.map { it.manifestUrl }.sorted()
+        }
+        LaunchedEffect(target, profileIndex, folder, readyAddons) {
             CollectionRepository.initialize()
-            target?.let { (collectionId, folderId) -> store.initialize(collectionId, folderId) }
+            val before = opened[kind]
+            val now = profileIndex to folder
+            if (target != null) {
+                val unresolved = store.uiState.value.tabs.any { tab ->
+                    !tab.isAllTab && tab.manifestUrl == null && tab.source?.let { it.isTmdb || it.isTrakt } != true
+                }
+                if ((before != null && before != now) || unresolved) store.clear()
+                opened[kind] = now
+                store.initialize(target.first, target.second)
+            }
         }
         val folderState by store.uiState.collectAsStateWithLifecycle()
         val personal by TotalEclipsePersonalRows.state(kind).collectAsStateWithLifecycle()
-        LaunchedEffect(kind) { TotalEclipsePersonalRows.refresh(kind) }
+        LaunchedEffect(kind, profileIndex) {
+            val before = personalFor[kind]
+            personalFor[kind] = profileIndex
+            TotalEclipsePersonalRows.refresh(kind, force = before != null && before != profileIndex)
+        }
         return remember(folderState, home.heroItems, target, personal) {
             val (pinned, personalRows) = personal.toSections(kind)
             val sections = arrangeLikeTheTVs(

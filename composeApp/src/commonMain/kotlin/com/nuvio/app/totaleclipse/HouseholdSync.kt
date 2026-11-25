@@ -419,8 +419,8 @@ internal object HouseholdSync {
 
     /**
      * The player switches both apps share, per profile (Mark's profile on the TVs auto-skips
-     * intros, recaps and credits and plays the next episode by itself). The TVs' PiP / Speed
-     * button choices don't map onto the phone's button layout, so they're left alone.
+     * intros, recaps and credits and plays the next episode by itself). Speed is hidden where the
+     * TVs hide it; their PiP choice is left alone (it's useful on a phone).
      */
     private fun applyPlayerSettings(slot: Int, tvId: String, reason: String) {
         val tv = HouseholdCloudStore.boolSettings(TV_GLOBAL_SETTINGS_KEY) +
@@ -431,6 +431,7 @@ internal object HouseholdSync {
             "nuvio.tv.settings.playback.autoSkipOutro" to com.nuvio.app.features.player.skip.AutoSkipSegmentType.OUTRO,
             "nuvio.tv.settings.playback.autoSkipMovieCredits" to com.nuvio.app.features.player.skip.AutoSkipSegmentType.MOVIE_CREDITS,
         )
+        tv["nuvio.tv.settings.playback.showSpeed"]?.let { TotalEclipsePlayerPrefs.setHidesSpeed(slot, !it) }
         val wanted = buildMap {
             skip.keys.forEach { key -> tv[key]?.let { put(key, it) } }
             tv["nuvio.tv.settings.playback.autoPlayNext"]?.let { put("autoPlayNext", it) }

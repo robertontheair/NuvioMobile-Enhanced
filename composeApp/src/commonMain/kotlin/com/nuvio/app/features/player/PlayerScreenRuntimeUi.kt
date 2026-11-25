@@ -506,7 +506,10 @@ private fun PlayerScreenRuntime.RenderPlayerControls(
     LaunchedEffect(totalEclipseRatingDue) {
         if (!totalEclipseRatingDue) return@LaunchedEffect
         totalEclipseRatingDue = false
-        if (canRate && userRating == null) showUserRatingSheet = true
+        if (canRate && userRating == null) {
+            totalEclipseRatingShown = true
+            showUserRatingSheet = true
+        }
     }
     val liveTvEpgNowMillis = rememberLiveTvEpgNowMillis()
     LaunchedEffect(isLiveTvPlayback) {
@@ -667,7 +670,10 @@ private fun PlayerScreenRuntime.RenderPlayerControls(
                 showStreamInfoModal = true
             },
             onRateClick = if (canRate) {
-                { showUserRatingSheet = true }
+                {
+                    totalEclipseRatingShown = false
+                    showUserRatingSheet = true
+                }
             } else null,
             userRating = userRating,
             onVideoSettingsClick = if (isIos || isAnimePlayback) {

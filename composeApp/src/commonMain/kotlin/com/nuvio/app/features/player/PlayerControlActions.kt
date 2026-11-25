@@ -228,7 +228,10 @@ internal fun PlayerControlActions(
                 icon = Icons.Rounded.SkipNext, iconSize = 40.dp,
             )
         }
-        this[PlayerToolbarButton.SPEED] = PlayerControlAction(
+        // Total Eclipse: no Speed on live channels, or where the TVs hide it (Mark).
+        if (com.nuvio.app.totaleclipse.LocalTotalEclipseLiveZap.current == null &&
+            !com.nuvio.app.totaleclipse.TotalEclipsePlayerPrefs.hidesSpeed
+        ) this[PlayerToolbarButton.SPEED] = PlayerControlAction(
             "${stringResource(Res.string.compose_player_speed)} ${formatPlaybackSpeedLabel(playbackSnapshot.playbackSpeed)}",
             onSpeedClick, icon = Icons.Rounded.Speed,
             popup = {

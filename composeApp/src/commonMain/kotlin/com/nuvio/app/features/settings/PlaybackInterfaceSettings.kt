@@ -9,6 +9,7 @@ import com.nuvio.app.core.ui.DialogOption
 import com.nuvio.app.core.ui.DialogSurface
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -61,6 +62,17 @@ internal fun PlaybackInterfaceSettings(
                     checked = settings.playerControlGlassEnabled,
                     isTablet = isTablet,
                     onCheckedChange = PlayerSettingsRepository::setPlayerControlGlassEnabled,
+                )
+                SettingsGroupDivider(isTablet = isTablet)
+                // Total Eclipse: the rating card at the credits, per profile.
+                val ratingPrompt by com.nuvio.app.totaleclipse.TotalEclipsePlayerPrefs.ratingPrompt.collectAsState()
+                androidx.compose.runtime.LaunchedEffect(Unit) { com.nuvio.app.totaleclipse.TotalEclipsePlayerPrefs.load() }
+                SettingsSwitchRow(
+                    title = "Offer a rating at the credits",
+                    description = "After movies and a season's last episode, if you haven't rated it.",
+                    checked = ratingPrompt,
+                    isTablet = isTablet,
+                    onCheckedChange = com.nuvio.app.totaleclipse.TotalEclipsePlayerPrefs::setRatingPrompt,
                 )
                 SettingsGroupDivider(isTablet = isTablet)
                 SettingsSwitchRow(

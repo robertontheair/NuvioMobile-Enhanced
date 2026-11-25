@@ -2,10 +2,14 @@ package com.nuvio.app.features.player
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import com.nuvio.app.core.logging.InAppLogger
 import com.nuvio.app.core.ui.NuvioToastController
+import com.nuvio.app.features.player.skip.AutoSkipSegmentType
 import com.nuvio.app.totaleclipse.TotalEclipseStallGuard
+import com.nuvio.app.totaleclipse.creditsHaveStarted
 import kotlinx.coroutines.delay
 import kotlin.time.Clock
 
@@ -82,11 +86,38 @@ internal fun PlayerScreenRuntime.BindTotalEclipsePlaybackGuards() {
         }
     }
 
-    // A rating, once, when a movie or a season's last episode ends (never over an automatic next episode).
-    LaunchedEffect(activePlaybackKey, playbackSnapshot.isEnded) {
-        if (!playbackSnapshot.isEnded || isLiveTvPlayback) return@LaunchedEffect
-        val next = nextEpisodeInfo
-        val finale = activeSeasonNumber != null && (next == null || next.season != activeSeasonNumber)
-        if (isMoviePlayback || finale) totalEclipseRatingDue = true
+    // A rating, once per title, when the credits of a movie or a season's last episode start.
+    val ratingOn by com.nuvio.app.totaleclipse.TotalEclipsePlayerPrefs.ratingPrompt.collectAsState()
+    LaunchedEffect(activePlaybackKey, ratingOn, isLiveTvPlayback) {
+        com.nuvio.app.totaleclipse.TotalEclipsePlayerPrefs.load()
+        if (!ratingOn || isLiveTvPlayback) return@LaunchedEffect
+        val key = "$parentMetaId:${activeSeasonNumber ?: ""}"
+        while (key !in ratingOffered) {
+            delay(1_000)
+            val snapshot = playbackSnapshot
+            if (!initialLoadCompleted || errorMessage != null || isScrubbingTimeline || snapshot.discExtraPlaying) continue
+            val next = nextEpisodeInfo
+            val finale = activeSeasonNumber != null && playerMeta != null &&
+                (next == null || (next.season != activeSeasonNumber && !playerSettingsUiState.streamAutoPlayNextEpisodeEnabled))
+            if (!isMoviePlayback && !finale) continue
+            val credits = skipIntervals
+                .filter {
+                    val type = AutoSkipSegmentType.fromSkipIntervalType(it.type)
+                    type == AutoSkipSegmentType.MOVIE_CREDITS || type == AutoSkipSegmentType.OUTRO
+                }
+                .maxOfOrNull { (it.startTime * 1000).toLong() }
+            if (!creditsHaveStarted(snapshot.positionMs, snapshot.durationMs, credits)) continue
+            ratingOffered += key
+            totalEclipseRatingDue = true
+        }
+    }
+    // Left alone, it goes away by itself.
+    LaunchedEffect(showUserRatingSheet, totalEclipseRatingShown) {
+        if (!showUserRatingSheet || !totalEclipseRatingShown) return@LaunchedEffect
+        delay(45_000)
+        showUserRatingSheet = false
     }
 }
+
+/** Titles (and seasons) already offered a rating since the app started. */
+private val ratingOffered = mutableSetOf<String>()

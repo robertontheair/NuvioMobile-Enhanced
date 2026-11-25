@@ -186,6 +186,8 @@ internal class PlayerScreenRuntime(
     var liveRetryCount by mutableStateOf(0)
     /** Total Eclipse: a movie or season just finished; offer a rating. */
     var totalEclipseRatingDue by mutableStateOf(false)
+    /** Total Eclipse: the rating card on screen was offered, not opened by hand. */
+    var totalEclipseRatingShown by mutableStateOf(false)
     /** Total Eclipse: the last position seen playing (an error can reset the snapshot to 0). */
     var lastPlayingPositionMs = 0L
     /** Total Eclipse: when this title last moved to another source part way through. */
