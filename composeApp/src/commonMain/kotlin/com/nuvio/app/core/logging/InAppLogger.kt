@@ -112,7 +112,7 @@ object InAppLogger {
             val slashIndex = rest.indexOf('/')
             val authority = if (slashIndex >= 0) rest.take(slashIndex) else rest
             val path = if (slashIndex >= 0) rest.drop(slashIndex) else ""
-            prefix + authority.substringAfter('@') + path
+            prefix + authority.substringAfter('@') + totalEclipseMaskPath(path)
         } else {
             withoutQuery
         }
@@ -204,5 +204,33 @@ object InAppLogBridge {
 
     fun mpv(platform: String, prefix: String, level: String, message: String) {
         InAppLogger.logMpv(platform = platform, prefix = prefix, level = level, message = message)
+    }
+}
+
+/**
+ * Total Eclipse: paths that carry secrets. Xtream links put the username and password in the
+ * path (/live/<user>/<pass>/123.ts, also /movie, /series, /timeshift and /<user>/<pass>/123), and
+ * the household's remote Live TV link puts its key there (/k/<key>/). Long opaque segments
+ * (tokens, debrid links) are masked too.
+ */
+internal fun totalEclipseMaskPath(path: String): String {
+    if (path.isEmpty()) return path
+    val segments = path.split('/').toMutableList()
+    // segments[0] is "" (the path starts with '/').
+    val first = segments.getOrNull(1).orEmpty().lowercase()
+    when {
+        first == "k" && segments.size > 2 -> segments[2] = "<key>"
+        first in setOf("live", "movie", "series", "timeshift") && segments.size > 4 -> {
+            segments[2] = "<user>"
+            segments[3] = "<pass>"
+        }
+        // Bare Xtream form: /<user>/<pass>/<stream id>
+        segments.size == 4 && segments[3].substringBefore('.').all(Char::isDigit) && segments[3].isNotEmpty() -> {
+            segments[1] = "<user>"
+            segments[2] = "<pass>"
+        }
+    }
+    return segments.joinToString("/") { segment ->
+        if (segment.length >= 32 && segment.all { it.isLetterOrDigit() || it == '-' || it == '_' }) "<token>" else segment
     }
 }
