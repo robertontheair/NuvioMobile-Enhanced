@@ -26,6 +26,11 @@ internal sealed interface AppDeepLink {
     data class Party(
         val code: String,
     ) : AppDeepLink
+
+    /** Total Eclipse: nuvio://live?channel=<channel id>, from a programme reminder. */
+    data class LiveChannel(
+        val channelId: String,
+    ) : AppDeepLink
 }
 
 internal object AppDeepLinkRepository {
@@ -67,6 +72,9 @@ fun buildMetaDeepLinkUrl(
 
 fun buildDownloadsDeepLinkUrl(): String = "nuvio://downloads"
 
+fun buildLiveChannelDeepLinkUrl(channelId: String): String =
+    "nuvio://live?channel=" + channelId.encodeURLParameter()
+
 internal fun parseAppDeepLink(url: String): AppDeepLink? {
     val parsedUrl = runCatching { Url(url) }.getOrNull() ?: return null
     val scheme = parsedUrl.protocol.name.lowercase()
@@ -101,6 +109,9 @@ internal fun parseAppDeepLink(url: String): AppDeepLink? {
         "imdb", "tmdb" -> parseProviderMetaDeepLink(host, pathSegments, parsedUrl)
 
         "downloads" -> AppDeepLink.Downloads
+
+        "live" -> (firstParameter(parsedUrl, "channel") ?: pathSegments.firstOrNull())
+            ?.let(AppDeepLink::LiveChannel)
 
         "party" -> partyDeepLink(pathSegments.firstOrNull() ?: firstParameter(parsedUrl, "code"))
 

@@ -213,6 +213,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
@@ -921,6 +922,11 @@ internal fun MainAppContent(
                         AppDeepLinkRepository.markConsumed(deepLink)
                     }
 
+                    is AppDeepLink.LiveChannel -> {
+                        // Played by the Live TV handler below (it needs the channel click action).
+                        activateTab(AppScreenTab.LiveTv)
+                    }
+
                     null -> Unit
                 }
             }
@@ -1540,6 +1546,24 @@ internal fun MainAppContent(
                     ),
                 )
                 navController.navigate(PlayerRoute(launchId = launchId))
+            }
+        }
+
+        // Total Eclipse: a programme reminder was tapped; play its channel once the lineup is in.
+        LaunchedEffect(Unit) {
+            if (!ownsAppRuntime) return@LaunchedEffect
+            AppDeepLinkRepository.pendingDeepLink.collectLatest { deepLink ->
+                if (deepLink !is AppDeepLink.LiveChannel) return@collectLatest
+                appGateController?.appReady?.first { it }
+                LiveTvRepository.ensureChannelsLoaded()
+                val channel = withTimeoutOrNull(30_000) {
+                    LiveTvRepository.uiState
+                        .map { state -> state.channels.firstOrNull { it.id == deepLink.channelId } }
+                        .first { it != null }
+                }
+                AppDeepLinkRepository.markConsumed(deepLink)
+                InAppLogger.info("App/DeepLink", "live channel ${if (channel != null) "found" else "not found"}")
+                if (channel != null) onLiveTvChannelClick(channel)
             }
         }
 

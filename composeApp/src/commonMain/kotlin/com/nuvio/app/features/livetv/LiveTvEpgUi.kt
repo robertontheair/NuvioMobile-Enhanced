@@ -19,6 +19,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.NotificationsNone
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Tv
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -29,6 +31,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -50,6 +53,7 @@ import com.nuvio.app.core.ui.NuvioModalBottomSheet
 import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.dismissNuvioBottomSheet
 import com.nuvio.app.core.ui.nuvio
+import com.nuvio.app.totaleclipse.TotalEclipseReminders
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
@@ -299,6 +303,8 @@ fun LiveTvEpgGuideSheet(
                     LiveTvEpgProgramRow(
                         program = program,
                         nowMillis = nowMillis,
+                        channelId = channel.id,
+                        channelName = channel.name,
                     )
                 }
             }
@@ -310,8 +316,16 @@ fun LiveTvEpgGuideSheet(
 private fun LiveTvEpgProgramRow(
     program: LiveTvEpgProgram,
     nowMillis: Long,
+    channelId: String,
+    channelName: String,
 ) {
     val tokens = MaterialTheme.nuvio
+    // Total Eclipse: "Remind me" (bell) on programmes that haven't started.
+    val reminders by TotalEclipseReminders.scheduled.collectAsState()
+    LaunchedEffect(Unit) { TotalEclipseReminders.ensureLoaded() }
+    val reminderScope = rememberCoroutineScope()
+    val canRemind = program.startMillis > nowMillis
+    val reminded = TotalEclipseReminders.id(channelId, program.startMillis) in reminders
     val isLive = program.isAiringAt(nowMillis)
     var expanded by rememberSaveable(program.startMillis, program.title) { mutableStateOf(false) }
     val hasDescription = !program.description.isNullOrBlank()
@@ -365,6 +379,36 @@ private fun LiveTvEpgProgramRow(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false),
                     )
+                }
+                if (canRemind) {
+                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(99.dp))
+                                .background(if (reminded) tokens.colors.accent.copy(alpha = 0.18f) else Color.Transparent)
+                                .clickable {
+                                    reminderScope.launch {
+                                        TotalEclipseReminders.toggle(channelId, channelName, program.title, program.startMillis)
+                                    }
+                                }
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                imageVector = if (reminded) Icons.Rounded.Notifications else Icons.Rounded.NotificationsNone,
+                                contentDescription = if (reminded) "Cancel reminder" else "Remind me",
+                                tint = if (reminded) tokens.colors.accent else tokens.colors.textMuted,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Text(
+                                text = if (reminded) "Reminder set" else "Remind me",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (reminded) tokens.colors.accent else tokens.colors.textMuted,
+                                maxLines = 1,
+                            )
+                        }
+                    }
                 }
             }
             Text(
