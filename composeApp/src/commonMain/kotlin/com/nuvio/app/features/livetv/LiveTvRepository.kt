@@ -420,6 +420,10 @@ object LiveTvRepository {
                 detectedEpgUrls = playlistEpgUrls.distinct()
                 channelsSignature = signature
                 if (fetchedChannels.isNotEmpty()) {
+                    // Total Eclipse: move old ids to the TVs' keys and merge the TVs' favourites/recents.
+                    com.nuvio.app.totaleclipse.HouseholdSync.liveLogs.let { (fav, recent) ->
+                        applyHouseholdLiveLogs(fav, recent)
+                    }
                     val epgUrls = detectedEpgUrls
                     val savedAt = Clock.System.now().toEpochMilliseconds()
                     withContext(Dispatchers.Default) {
@@ -595,6 +599,9 @@ object LiveTvRepository {
                     current + channelId
                 }
             }
+        com.nuvio.app.totaleclipse.TotalEclipseLiveSync.recordFavorite(
+            _uiState.value.favoriteChannelIds, channelId, on = channelId in favorites,
+        )
         persistFavoriteChannelIds(favorites)
         _uiState.value = _uiState.value.copy(favoriteChannelIds = favorites)
     }
@@ -602,6 +609,7 @@ object LiveTvRepository {
     fun markChannelWatched(channel: LiveTvChannel) {
         ensureLoaded()
         LiveTvStorage.saveLastWatchedChannelId(channel.id)
+        com.nuvio.app.totaleclipse.TotalEclipseLiveSync.recordRecent(_uiState.value.recentChannelIds, channel.id, removed = false)
         val recents = (listOf(channel.id) + _uiState.value.recentChannelIds.filterNot { it == channel.id })
             .take(LIVE_TV_MAX_RECENT_CHANNELS)
         LiveTvStorage.saveRecentChannelIdsBlob(recents.joinToString("\n"))
@@ -619,6 +627,7 @@ object LiveTvRepository {
 
     /** Total Eclipse: removes one channel from Recently Watched. */
     fun removeRecentChannel(channelId: String) {
+        com.nuvio.app.totaleclipse.TotalEclipseLiveSync.recordRecent(_uiState.value.recentChannelIds, channelId, removed = true)
         val recents = _uiState.value.recentChannelIds.filterNot { it == channelId }
         LiveTvStorage.saveRecentChannelIdsBlob(recents.joinToString("\n"))
         _uiState.value = _uiState.value.copy(recentChannelIds = recents)
@@ -626,8 +635,43 @@ object LiveTvRepository {
 
     fun clearRecentChannels() {
         ensureLoaded()
+        _uiState.value.recentChannelIds.forEach {
+            com.nuvio.app.totaleclipse.TotalEclipseLiveSync.recordRecent(_uiState.value.recentChannelIds, it, removed = true)
+        }
         LiveTvStorage.saveRecentChannelIdsBlob("")
         _uiState.value = _uiState.value.copy(recentChannelIds = emptyList())
+    }
+
+    /**
+     * Total Eclipse: moves favourites and recents saved under the phone's old channel ids to the
+     * TVs' keys (once, after channels load), then merges the TVs' logs when there are any.
+     */
+    fun applyHouseholdLiveLogs(tvFavoritesLog: String?, tvRecentsLog: String?) {
+        ensureLoaded()
+        val sync = com.nuvio.app.totaleclipse.TotalEclipseLiveSync
+        val legacy = sync.legacyIds
+        val state = _uiState.value
+        val movedFavorites = state.favoriteChannelIds.map { legacy[it] ?: it }.toSet()
+        val movedRecents = state.recentChannelIds.map { legacy[it] ?: it }.distinct()
+        val localFav = sync.localFavorites(movedFavorites).entries
+            .fold(emptyMap<String, Pair<Int, Double>>()) { acc, (k, v) -> sync.mergeFavorites(acc, mapOf((legacy[k] ?: k) to v)) }
+        val localRecent = sync.localRecents(movedRecents).entries
+            .fold(emptyMap<String, Double>()) { acc, (k, v) -> sync.mergeRecents(acc, mapOf((legacy[k] ?: k) to v)) }
+        val favLog = sync.mergeFavorites(localFav, sync.parseFavorites(tvFavoritesLog))
+        val recentLog = sync.mergeRecents(localRecent, sync.parseRecents(tvRecentsLog))
+        sync.saveFavorites(favLog)
+        sync.saveRecents(recentLog)
+        val favorites = sync.favoritesOn(favLog) + movedFavorites.filterNot { it.startsWith("ch:") }
+        val recents = sync.orderedRecents(recentLog, LIVE_TV_MAX_RECENT_CHANNELS)
+        if (favorites != state.favoriteChannelIds) persistFavoriteChannelIds(favorites)
+        if (recents != state.recentChannelIds) LiveTvStorage.saveRecentChannelIdsBlob(recents.joinToString("\n"))
+        if (favorites != state.favoriteChannelIds || recents != state.recentChannelIds) {
+            _uiState.value = _uiState.value.copy(favoriteChannelIds = favorites, recentChannelIds = recents)
+            com.nuvio.app.core.logging.InAppLogger.info(
+                "TotalEclipse/LiveSync",
+                "favourites ${state.favoriteChannelIds.size}→${favorites.size}, recents ${state.recentChannelIds.size}→${recents.size}",
+            )
+        }
     }
 
     private fun loadRecentChannelIds(): List<String> =
@@ -707,6 +751,7 @@ internal fun parseM3uPlaylist(
     playlist: LiveTvPlaylist? = null,
 ): List<LiveTvChannel> {
     val channelIdentityCounts = mutableMapOf<String, Int>() // Total Eclipse
+    val legacyIds = mutableMapOf<String, String>() // Total Eclipse: old phone id → TV key
     val totalEclipseLabels = mutableMapOf<String, Map<String, String>>() // Total Eclipse
     val channels = mutableListOf<LiveTvChannel>()
     var pendingInfo: M3uInfo? = null
@@ -746,12 +791,17 @@ internal fun parseM3uPlaylist(
                     // Total Eclipse: an id that survives playlist reorders and the switch between the
                     // home and away-from-home link (epgfix /play/<key> keeps its last segment), so
                     // favourites and recents stick. HomeTV keys channels by name the same way.
-                    val identity = "$name|${info?.group.orEmpty()}|" +
+                    // The key is the Apple TVs' own (name, group, guide id), so favourites and
+                    // Recently Watched can come from the TVs; the old phone id is kept for the move.
+                    val legacyIdentity = "$name|${info?.group.orEmpty()}|" +
                         streamUrl.substringBefore('?').trimEnd('/').substringAfterLast('/')
-                    val occurrence = (channelIdentityCounts[identity] ?: 0) + 1
-                    channelIdentityCounts[identity] = occurrence
+                    val portable = com.nuvio.app.totaleclipse.TotalEclipseLiveSync.portableKey(name, info?.group, info?.epgId)
+                    val occurrence = (channelIdentityCounts[portable] ?: 0) + 1
+                    channelIdentityCounts[portable] = occurrence
+                    val channelId = portable + if (occurrence > 1) ":$occurrence" else ""
+                    legacyIds["ch:${legacyIdentity.hashCode().toUInt().toString(16)}"] = channelId
                     channels += LiveTvChannel(
-                        id = "ch:${identity.hashCode().toUInt().toString(16)}" + if (occurrence > 1) ":$occurrence" else "",
+                        id = channelId,
                         name = name,
                         streamUrl = streamUrl,
                         logoUrl = info?.logoUrl?.takeIf(String::isNotBlank),
@@ -771,6 +821,7 @@ internal fun parseM3uPlaylist(
             }
         }
 
+    com.nuvio.app.totaleclipse.TotalEclipseLiveSync.addLegacyIds(legacyIds)
     // Total Eclipse: HomeTV's categories for an epgfix lineup.
     return com.nuvio.app.totaleclipse.TotalEclipseLiveGroups.regroup(
         channels.distinctBy { it.streamUrl },

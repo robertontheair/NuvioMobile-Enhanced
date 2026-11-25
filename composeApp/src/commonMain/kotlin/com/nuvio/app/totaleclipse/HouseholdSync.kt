@@ -41,6 +41,10 @@ import kotlinx.serialization.json.put
  * change that value. Nothing is ever written to iCloud. Logs name keys and counts, never values.
  */
 internal object HouseholdSync {
+    /** The active profile's Live TV favourites and recents logs from the TVs (raw JSON). */
+    @kotlin.concurrent.Volatile var liveLogs: Pair<String?, String?> = null to null
+        private set
+
     private const val TAG = "TotalEclipse/Household"
 
     // Written by the TVs (HomeTV ICloudSettingsSyncManager.swift).
@@ -213,6 +217,16 @@ internal object HouseholdSync {
         }
 
         applyPlayerSettings(slot, tvId, reason)
+
+        // Live TV favourites and Recently Watched: the TVs' dated logs, merged into the phone's.
+        val profileSettings = HouseholdCloudStore.stringSettings(TV_PROFILE_SETTINGS_PREFIX + tvId)
+        val logs = profileSettings[TotalEclipseLiveSync.TV_FAVORITES_LOG] to profileSettings[TotalEclipseLiveSync.TV_RECENTS_LOG]
+        if (logs != liveLogs) {
+            liveLogs = logs
+            if (com.nuvio.app.features.livetv.LiveTvRepository.uiState.value.channels.isNotEmpty()) {
+                com.nuvio.app.features.livetv.LiveTvRepository.applyHouseholdLiveLogs(logs.first, logs.second)
+            }
+        }
 
         HouseholdCloudStore.text(TV_COLLECTIONS_PREFIX + tvId)?.takeIf { it.isNotBlank() }?.let { collections ->
             if (changedSinceLastApply("collections.$slot", collections)) {
