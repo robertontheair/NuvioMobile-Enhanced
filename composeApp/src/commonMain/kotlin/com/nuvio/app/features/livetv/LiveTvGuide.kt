@@ -230,7 +230,7 @@ private fun LiveTvGuideRow(
                         verticalArrangement = Arrangement.Center,
                     ) {
                         Text(
-                            text = program.title,
+                            text = program.displayTitle,
                             style = MaterialTheme.typography.labelLarge,
                             color = when {
                                 airing -> tokens.colors.accent
@@ -241,13 +241,19 @@ private fun LiveTvGuideRow(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
-                        Text(
-                            text = liveTvEpgTimeRange(program),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = tokens.colors.textMuted.copy(alpha = if (past) 0.6f else 1f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Clip,
-                        )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            program.guideTags.take(2).forEach { LiveTvGuideTagPill(it) }
+                            Text(
+                                text = liveTvEpgTimeRange(program),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = tokens.colors.textMuted.copy(alpha = if (past) 0.6f else 1f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Clip,
+                            )
+                        }
                     }
                 }
                 LiveTvGuideNowLine(windowStart = windowStart, nowMillis = nowMillis)

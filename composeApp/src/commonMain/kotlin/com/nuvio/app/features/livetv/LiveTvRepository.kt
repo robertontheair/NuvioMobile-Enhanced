@@ -617,6 +617,13 @@ object LiveTvRepository {
         _uiState.value = _uiState.value.copy(isChannelGridEnabled = enabled)
     }
 
+    /** Total Eclipse: removes one channel from Recently Watched. */
+    fun removeRecentChannel(channelId: String) {
+        val recents = _uiState.value.recentChannelIds.filterNot { it == channelId }
+        LiveTvStorage.saveRecentChannelIdsBlob(recents.joinToString("\n"))
+        _uiState.value = _uiState.value.copy(recentChannelIds = recents)
+    }
+
     fun clearRecentChannels() {
         ensureLoaded()
         LiveTvStorage.saveRecentChannelIdsBlob("")

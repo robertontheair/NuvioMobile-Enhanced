@@ -1,5 +1,7 @@
 package com.nuvio.app.totaleclipse
 
+import com.nuvio.app.features.livetv.displayTitle
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -151,7 +153,7 @@ private fun liveSearchMatches(
         }
         .sortedBy { it.third }
         .take((30 - byName.size).coerceAtLeast(0))
-        .map { (channel, program) -> channel to "${whenLabel(program.startMillis, now)} · ${program.title}" }
+        .map { (channel, program) -> channel to "${whenLabel(program.startMillis, now)} · ${program.displayTitle}" }
         .toList()
     return byName + byShow
 }

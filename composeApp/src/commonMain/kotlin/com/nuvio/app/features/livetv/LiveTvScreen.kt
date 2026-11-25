@@ -286,6 +286,9 @@ fun LiveTvScreen(
         }
     }
 
+    // Total Eclipse: ✕ on each channel while Recently Watched is showing.
+    val removeRecent: ((LiveTvChannel) -> Unit)? =
+        if (filterMode == LiveTvChannelFilterMode.Recents) { channel -> LiveTvRepository.removeRecentChannel(channel.id) } else null
     val playChannel: (LiveTvChannel) -> Unit = { channel ->
         com.nuvio.app.totaleclipse.TotalEclipseLiveZap.setLineup(visibleChannels)
         LiveTvRepository.markChannelWatched(channel)
@@ -773,6 +776,7 @@ fun LiveTvScreen(
                             onPlayClick = playChannel,
                             epgPrograms = uiState.epgPrograms,
                             nowMillis = epgNowMillis,
+                            onRemoveRecent = removeRecent,
                         )
                     } else {
                         liveTvChannelList(
@@ -784,6 +788,7 @@ fun LiveTvScreen(
                             epgPrograms = uiState.epgPrograms,
                             nowMillis = epgNowMillis,
                             onGuideClick = { channel -> guideChannelId = channel.id },
+                            onRemoveRecent = removeRecent,
                         )
                     }
                 }
@@ -858,6 +863,7 @@ private fun LazyListScope.liveTvChannelGrid(
     onPlayClick: (LiveTvChannel) -> Unit,
     epgPrograms: Map<String, List<LiveTvEpgProgram>>,
     nowMillis: Long,
+    onRemoveRecent: ((LiveTvChannel) -> Unit)? = null,
 ) {
     val rows = channels.chunked(columns)
     items(
@@ -875,9 +881,10 @@ private fun LazyListScope.liveTvChannelGrid(
                     isFavorite = channel.id in favoriteChannelIds,
                     currentProgramTitle = epgPrograms[channel.id]
                         ?.firstOrNull { it.isAiringAt(nowMillis) }
-                        ?.title,
+                        ?.displayTitle,
                     onFavoriteClick = { onFavoriteClick(channel) },
                     onPlayClick = { onPlayClick(channel) },
+                    onRemove = onRemoveRecent?.let { remove -> { remove(channel) } },
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -895,6 +902,7 @@ private fun LiveTvChannelGridCell(
     currentProgramTitle: String?,
     onFavoriteClick: () -> Unit,
     onPlayClick: () -> Unit,
+    onRemove: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val tokens = MaterialTheme.nuvio
@@ -931,6 +939,25 @@ private fun LiveTvChannelGridCell(
                         modifier = Modifier.size(16.dp),
                         tint = if (isFavorite) tokens.colors.warning else Color.White,
                     )
+                }
+                if (onRemove != null) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(4.dp)
+                            .size(28.dp)
+                            .clip(RoundedCornerShape(99.dp))
+                            .background(Color.Black.copy(alpha = 0.45f))
+                            .clickable(onClick = onRemove),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Close,
+                            contentDescription = "Remove from Recently Watched",
+                            modifier = Modifier.size(16.dp),
+                            tint = Color.White,
+                        )
+                    }
                 }
             }
             Text(
@@ -1442,6 +1469,7 @@ private fun LazyListScope.liveTvChannelList(
     epgPrograms: Map<String, List<LiveTvEpgProgram>> = emptyMap(),
     nowMillis: Long = 0L,
     onGuideClick: (LiveTvChannel) -> Unit = {},
+    onRemoveRecent: ((LiveTvChannel) -> Unit)? = null,
 ) {
     items(
         items = channels,
@@ -1456,6 +1484,7 @@ private fun LazyListScope.liveTvChannelList(
             programs = epgPrograms[channel.id].orEmpty(),
             nowMillis = nowMillis,
             onGuideClick = { onGuideClick(channel) },
+            onRemove = onRemoveRecent?.let { remove -> { remove(channel) } },
         )
     }
 }
@@ -1471,6 +1500,7 @@ private fun LiveTvChannelCard(
     programs: List<LiveTvEpgProgram> = emptyList(),
     nowMillis: Long = 0L,
     onGuideClick: () -> Unit = {},
+    onRemove: (() -> Unit)? = null,
 ) {
     val tokens = MaterialTheme.nuvio
     Surface(
@@ -1503,6 +1533,15 @@ private fun LiveTvChannelCard(
                         programs = programs,
                         nowMillis = nowMillis,
                         onClick = onGuideClick,
+                    )
+                }
+            }
+            if (onRemove != null) {
+                IconButton(onClick = onRemove) {
+                    Icon(
+                        imageVector = Icons.Rounded.Close,
+                        contentDescription = "Remove from Recently Watched",
+                        tint = tokens.colors.textMuted,
                     )
                 }
             }

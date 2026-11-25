@@ -152,13 +152,15 @@ internal fun LiveTvEpgNowNext(
                     maxLines = 1,
                 )
                 Text(
-                    text = current.title,
+                    text = current.displayTitle,
                     style = MaterialTheme.typography.bodySmall,
                     color = tokens.colors.textSecondary,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
                 )
+                current.guideTags.take(2).forEach { LiveTvGuideTagPill(it) }
             }
             LiveTvEpgProgressBar(
                 progress = current.progressAt(nowMillis),
@@ -169,7 +171,7 @@ internal fun LiveTvEpgNowNext(
         }
         if (next != null) {
             Text(
-                text = "${stringResource(Res.string.live_tv_epg_next)} ${formatLiveTvEpgTime(next.startMillis)} · ${next.title}",
+                text = "${stringResource(Res.string.live_tv_epg_next)} ${formatLiveTvEpgTime(next.startMillis)} · ${next.displayTitle}",
                 style = MaterialTheme.typography.bodySmall,
                 color = tokens.colors.textMuted,
                 maxLines = 1,
@@ -370,6 +372,7 @@ private fun LiveTvEpgProgramRow(
                         )
                     }
                 }
+                program.guideTags.forEach { LiveTvGuideTagPill(it) }
                 if (!program.category.isNullOrBlank()) {
                     Text(
                         text = program.category,
@@ -388,7 +391,7 @@ private fun LiveTvEpgProgramRow(
                                 .background(if (reminded) tokens.colors.accent.copy(alpha = 0.18f) else Color.Transparent)
                                 .clickable {
                                     reminderScope.launch {
-                                        TotalEclipseReminders.toggle(channelId, channelName, program.title, program.startMillis)
+                                        TotalEclipseReminders.toggle(channelId, channelName, program.displayTitle, program.startMillis)
                                     }
                                 }
                                 .padding(horizontal = 8.dp, vertical = 4.dp),
@@ -412,7 +415,7 @@ private fun LiveTvEpgProgramRow(
                 }
             }
             Text(
-                text = program.title,
+                text = program.displayTitle,
                 style = MaterialTheme.typography.titleSmall,
                 color = tokens.colors.textPrimary,
                 fontWeight = FontWeight.SemiBold,
