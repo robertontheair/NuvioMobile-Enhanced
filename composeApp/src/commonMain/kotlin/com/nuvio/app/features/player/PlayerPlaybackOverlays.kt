@@ -75,6 +75,7 @@ internal fun BoxScope.PlayerPlaybackOverlays(
     onOpenMovieRecommendation: (MetaPreview) -> Unit = {},
     onDismissMovieRecommendations: () -> Unit = {},
     errorMessage: String?,
+    onRetryError: (() -> Unit)? = null,
     onDismissError: () -> Unit,
 ) {
     var skipHeightPx by remember { mutableIntStateOf(0) }
@@ -194,6 +195,7 @@ internal fun BoxScope.PlayerPlaybackOverlays(
     if (errorMessage != null) {
         ErrorModal(
             message = errorMessage,
+            onRetry = onRetryError,
             onDismiss = onDismissError,
         )
     }

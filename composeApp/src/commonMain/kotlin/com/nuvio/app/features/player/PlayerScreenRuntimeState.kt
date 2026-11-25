@@ -182,6 +182,8 @@ internal class PlayerScreenRuntime(
     var playerController by mutableStateOf<PlayerEngineController?>(null)
     var playerControllerSourceUrl by mutableStateOf<String?>(null)
     var errorMessage by mutableStateOf<String?>(null)
+    /** Total Eclipse: Live TV "Try Again" rebuilds the player when this changes. */
+    var liveRetryCount by mutableStateOf(0)
     var isScrubbingTimeline by mutableStateOf(false)
     var isTouchingTimeline by mutableStateOf(false)
     var scrubbingPositionMs by mutableStateOf<Long?>(null)

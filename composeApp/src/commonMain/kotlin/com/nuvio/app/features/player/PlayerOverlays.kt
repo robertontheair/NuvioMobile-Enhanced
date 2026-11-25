@@ -294,6 +294,7 @@ internal fun PauseMetadataOverlay(
 internal fun ErrorModal(
     message: String,
     onDismiss: () -> Unit,
+    onRetry: (() -> Unit)? = null,
 ) {
     Box(
         modifier = Modifier
@@ -322,6 +323,27 @@ internal fun ErrorModal(
                 maxLines = 4,
                 overflow = TextOverflow.Ellipsis,
             )
+            if (onRetry != null) {
+                // Total Eclipse: Try Again (Live TV), as on the Apple TVs.
+                Surface(
+                    modifier = Modifier
+                        .padding(top = 4.dp)
+                        .widthIn(min = 180.dp, max = 260.dp)
+                        .clickable(onClick = onRetry),
+                    color = Color.White.copy(alpha = 0.16f),
+                    shape = RoundedCornerShape(12.dp),
+                ) {
+                    Text(
+                        text = "Try Again",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 12.dp),
+                        style = MaterialTheme.nuvioTypeScale.bodyLg.copy(fontWeight = FontWeight.Bold),
+                        color = Color.White,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            }
             Surface(
                 modifier = Modifier
                     .padding(top = 4.dp)

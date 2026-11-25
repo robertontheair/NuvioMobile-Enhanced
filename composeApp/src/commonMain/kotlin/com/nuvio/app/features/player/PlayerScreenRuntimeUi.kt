@@ -320,7 +320,7 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi(
         val resolvedAutoEngine = resolvedAutoEngineState.value
 
         if (playerSurfaceSourceUrl != null) {
-            key(playbackKey) {
+            key(playbackKey, liveRetryCount) {
                 val active = remember { mutableStateOf(true) }
                 DisposableEffect(Unit) {
                     onDispose { active.value = false }
@@ -836,6 +836,15 @@ private fun BoxScope.RenderPlaybackOverlays(
                 delay(1_000L)
             }
         }
+        // Total Eclipse: on Live TV, a failure from a dead channel (the provider sends a web page)
+        // reads as "isn't broadcasting right now" instead of the player's technical message.
+        val liveErrorMessage by produceState<String?>(null, errorMessage, isLiveTvPlayback) {
+            val raw = errorMessage
+            if (raw == null || !isLiveTvPlayback) { value = raw; return@produceState }
+            value = null
+            val dead = com.nuvio.app.totaleclipse.TotalEclipseLiveProbe.looksDead(activeSourceUrl, activeSourceHeaders)
+            value = if (dead) com.nuvio.app.totaleclipse.TotalEclipseLiveProbe.message(title) else raw
+        }
         PlayerPlaybackOverlays(
             playerControlsLocked = playerControlsLocked,
             useLegacyLayout = playerSettingsUiState.useLegacyPlayerLayout,
@@ -940,7 +949,13 @@ private fun BoxScope.RenderPlaybackOverlays(
             )
             showMovieRecommendationCard = false
         },
-        errorMessage = errorMessage,
+        errorMessage = liveErrorMessage,
+            onRetryError = if (isLiveTvPlayback) {
+                {
+                    errorMessage = null
+                    liveRetryCount += 1
+                }
+            } else null,
             onDismissError = {
                 flushWatchProgress()
                 args.onBack()
