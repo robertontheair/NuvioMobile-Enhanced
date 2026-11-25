@@ -24,8 +24,11 @@ internal actual object HouseholdCloudStore {
         store.synchronize()
     }
 
-    actual fun keys(): Set<String> =
-        store.dictionaryRepresentation.keys.mapNotNull { it as? String }.toSet()
+    actual fun keys(): Set<String> {
+        // Null at run time in a build without the iCloud entitlement (an unsigned simulator build).
+        val all: Map<Any?, *>? = store.dictionaryRepresentation
+        return all?.keys?.mapNotNull { it as? String }?.toSet().orEmpty()
+    }
 
     actual fun text(key: String): String? =
         when (val value = store.objectForKey(key)) {

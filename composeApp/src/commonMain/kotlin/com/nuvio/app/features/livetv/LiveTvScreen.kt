@@ -163,6 +163,7 @@ fun LiveTvScreen(
     val onNowFilter = onNowFilterName?.let { name -> LiveTvOnNowFilter.entries.firstOrNull { it.name == name } }
     var selectedCategoryName by rememberSaveable { mutableStateOf<String?>(null) }
     var guideChannelId by rememberSaveable { mutableStateOf<String?>(null) }
+    var guideFocusStart by rememberSaveable { mutableStateOf<Long?>(null) }
     val epgNowMillis = rememberLiveTvEpgNowMillis()
     val guideScrollState = rememberScrollState()
     val guideDensity = LocalDensity.current
@@ -639,7 +640,10 @@ fun LiveTvScreen(
                         nowMillis = epgNowMillis,
                         onChannelClick = playChannel,
                         onProgramClick = { channel, program ->
-                            if (program.isAiringAt(epgNowMillis)) playChannel(channel) else guideChannelId = channel.id
+                            if (program.isAiringAt(epgNowMillis)) playChannel(channel) else {
+                                guideFocusStart = program.startMillis
+                                guideChannelId = channel.id
+                            }
                         },
                     )
 
@@ -812,7 +816,10 @@ fun LiveTvScreen(
                             onPlayClick = playChannel,
                             epgPrograms = uiState.epgPrograms,
                             nowMillis = epgNowMillis,
-                            onGuideClick = { channel -> guideChannelId = channel.id },
+                            onGuideClick = { channel ->
+                                guideFocusStart = null
+                                guideChannelId = channel.id
+                            },
                             onRemoveRecent = removeRecent,
                         )
                     }
@@ -831,6 +838,7 @@ fun LiveTvScreen(
                     playChannel(guideChannel)
                 },
                 onDismiss = { guideChannelId = null },
+                focusStartMillis = guideFocusStart,
             )
         }
 

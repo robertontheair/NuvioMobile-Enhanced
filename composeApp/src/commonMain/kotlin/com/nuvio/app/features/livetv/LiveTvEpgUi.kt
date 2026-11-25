@@ -85,6 +85,12 @@ fun rememberLiveTvEpgNowMillis(): Long {
 
 fun formatLiveTvEpgTime(epochMillis: Long): String {
     val dateTime = Instant.fromEpochMilliseconds(epochMillis).toLocalDateTime(TimeZone.currentSystemDefault())
+    val minute = dateTime.minute.toString().padStart(2, '0')
+    // Total Eclipse: the phone's own clock setting ("9:00 PM" in the US, as on the Apple TVs).
+    if (!com.nuvio.app.totaleclipse.TotalEclipseClock.uses24Hours) {
+        val hour = (dateTime.hour % 12).let { if (it == 0) 12 else it }
+        return "$hour:$minute ${if (dateTime.hour < 12) "AM" else "PM"}"
+    }
     return "${dateTime.hour.toString().padStart(2, '0')}:${dateTime.minute.toString().padStart(2, '0')}"
 }
 
@@ -189,6 +195,8 @@ fun LiveTvEpgGuideSheet(
     nowMillis: Long,
     onPlayClick: () -> Unit,
     onDismiss: () -> Unit,
+    /** Total Eclipse: the programme tapped in the guide; the list opens at it. */
+    focusStartMillis: Long? = null,
 ) {
     val tokens = MaterialTheme.nuvio
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -287,6 +295,11 @@ fun LiveTvEpgGuideSheet(
             )
         } else {
             LazyColumn(
+                state = androidx.compose.foundation.lazy.rememberLazyListState(
+                    initialFirstVisibleItemIndex = remember {
+                        upcoming.indexOfFirst { it.startMillis == focusStartMillis }.coerceAtLeast(0)
+                    },
+                ),
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(max = 560.dp),
@@ -380,11 +393,13 @@ private fun LiveTvEpgProgramRow(
                         color = tokens.colors.textMuted,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false),
+                        modifier = Modifier.weight(1f),
                     )
+                } else {
+                    Box(modifier = Modifier.weight(1f))
                 }
                 if (canRemind) {
-                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+                    Box(contentAlignment = Alignment.CenterEnd) {
                         Row(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(99.dp))

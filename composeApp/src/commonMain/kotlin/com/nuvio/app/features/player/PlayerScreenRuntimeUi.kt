@@ -542,7 +542,7 @@ private fun PlayerScreenRuntime.RenderPlayerControls(
         val pipAvailable = isIos && playerSettingsUiState.miniPlayerEnabled &&
             playerController?.isPictureInPictureSupported() == true
         PlayerControlsShell(
-            title = title,
+            title = if (isLiveTvPlayback) activeStreamTitle.ifBlank { title } else title,
             titleLogo = playerTitleLogo,
             showTitleLogo = showPlayerTitleLogo,
             streamTitle = activeStreamTitle,
@@ -722,7 +722,7 @@ private fun PlayerScreenRuntime.RenderPlayerControls(
                     openExternal(
                         ExternalPlayerPlaybackRequest(
                             sourceUrl = activeSourceUrl,
-                            title = title,
+                            title = if (isLiveTvPlayback) activeStreamTitle.ifBlank { title } else title,
                             streamTitle = activeStreamTitle,
                             sourceHeaders = activeSourceHeaders,
                             resumePositionMs = playbackSnapshot.positionMs,

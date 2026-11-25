@@ -72,6 +72,7 @@ internal fun LiveTvGuideTagPill(tag: String, modifier: Modifier = Modifier) {
         text = tag,
         color = Color.White,
         fontSize = 9.sp,
+        lineHeight = 12.sp,
         fontWeight = FontWeight.Bold,
         maxLines = 1,
         modifier = modifier
