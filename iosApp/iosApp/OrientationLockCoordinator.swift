@@ -18,6 +18,23 @@ final class OrientationLockAppDelegate: NSObject, UIApplicationDelegate, UNUserN
         return true
     }
 
+    // Total Eclipse: a connected display gets its own scene; everything else is SwiftUI's.
+    func application(
+        _ application: UIApplication,
+        configurationForConnecting connectingSceneSession: UISceneSession,
+        options: UIScene.ConnectionOptions
+    ) -> UISceneConfiguration {
+        guard connectingSceneSession.role == .windowExternalDisplayNonInteractive else {
+            return UISceneConfiguration(name: nil, sessionRole: connectingSceneSession.role)
+        }
+        let configuration = UISceneConfiguration(
+            name: TotalEclipseExternalDisplay.sceneConfigurationName,
+            sessionRole: connectingSceneSession.role
+        )
+        configuration.delegateClass = TotalEclipseExternalDisplaySceneDelegate.self
+        return configuration
+    }
+
     func application(
         _ application: UIApplication,
         supportedInterfaceOrientationsFor window: UIWindow?
@@ -132,6 +149,7 @@ final class OrientationLockCoordinator {
             let preferences = UIWindowScene.GeometryPreferences.iOS(interfaceOrientations: mask)
             UIApplication.shared.connectedScenes
                 .compactMap { $0 as? UIWindowScene }
+                .filter { $0.session.role == .windowApplication }
                 .forEach { scene in
                     scene.requestGeometryUpdate(preferences) { error in
                         print("[OrientationLockCoordinator] Geometry update failed: \(error.localizedDescription)")
@@ -155,7 +173,9 @@ final class OrientationLockCoordinator {
 
     private var preferredLandscapeOrientation: UIInterfaceOrientation {
         if let sceneOrientation = UIApplication.shared.connectedScenes
-            .compactMap({ ($0 as? UIWindowScene)?.interfaceOrientation })
+            .compactMap({ $0 as? UIWindowScene })
+            .filter({ $0.session.role == .windowApplication })
+            .map(\.interfaceOrientation)
             .first(where: \.isLandscape) {
             return sceneOrientation
         }

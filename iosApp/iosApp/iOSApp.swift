@@ -8,6 +8,7 @@ struct iOSApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .background(TotalEclipseExternalDisplayOffer())   // Total Eclipse
                 .preferredColorScheme(.dark)
                 .onOpenURL { url in
                     AppUrlBridgeKt.handleAppUrl(url: url.absoluteString)

@@ -609,6 +609,8 @@ final class MPVPlayerViewController: UIViewController {
         }
         view.layer.addSublayer(pip.displayLayer)
         view.layer.addSublayer(metalLayer)
+        NotificationCenter.default.addObserver(self, selector: #selector(externalDisplayChanged),
+                                               name: TotalEclipseExternalDisplay.didChange, object: nil)
         layoutPlayerSurfaces()
 
         retireOtherPlayers()
@@ -764,13 +766,70 @@ final class MPVPlayerViewController: UIViewController {
         }
     }
 
+    // MARK: - Total Eclipse: connected display
+
+    private weak var externalStage: TotalEclipseExternalDisplay.StageView?
+    private var remoteBackdrop: TotalEclipseRemoteBackdrop?
+    private var isOnExternalDisplay: Bool { externalStage != nil }
+
+    @objc private func externalDisplayChanged() {
+        guard isViewLoaded, !isPlayerDestroyed else { return }
+        layoutPlayerSurfaces()
+    }
+
+    /// Puts the video on the connected display when there is one (not for previews), else here.
+    private func placeVideoLayer() {
+        guard !isPlayerDestroyed else { return }
+        let stage = isEmbeddedPreviewMode || PlayerPictureInPictureParking.shared.isParked(player: self)
+            ? nil : TotalEclipseExternalDisplay.shared.claim(for: self)
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        defer { CATransaction.commit() }
+        let host: CALayer = stage?.layer ?? view.layer
+        let changed = stage !== externalStage
+        externalStage = stage
+        if metalLayer.superlayer !== host, mpv != nil || changed {
+            if stage != nil {
+                host.addSublayer(metalLayer)
+            } else {
+                host.insertSublayer(metalLayer, above: pictureInPictureController?.displayLayer)
+            }
+        }
+        guard changed else { return }
+        if stage == nil {
+            TotalEclipseExternalDisplay.shared.release(self)
+            remoteBackdrop?.removeFromSuperview()
+            remoteBackdrop = nil
+        } else {
+            let backdrop = TotalEclipseRemoteBackdrop(frame: view.bounds)
+            backdrop.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            view.addSubview(backdrop)
+            remoteBackdrop = backdrop
+            updateRemoteBackdrop()
+        }
+        // Subtitles on the TV are drawn into the video; the device's own overlay stays empty.
+        updateStyledSubtitle()
+        InAppLogBridge.shared.info(tag: "Player/ExternalDisplay", message: stage == nil ? "video on the device" : "video on the display")
+    }
+
+    private func updateRemoteBackdrop() {
+        remoteBackdrop?.update(
+            title: cachedNowPlayingMetadata?.title,
+            subtitle: cachedNowPlayingMetadata?.subtitle,
+            artworkUrl: cachedNowPlayingMetadata?.artworkUrl
+        )
+    }
+
     private func renderScale() -> CGFloat {
+        if let screen = externalStage?.window?.screen { return max(screen.scale, screen.nativeScale) }
         let screen = view.window?.screen ?? UIScreen.main
         return max(screen.scale, screen.nativeScale)
     }
 
     private func layoutPlayerSurfaces() {
-        let bounds = CGRect(origin: .zero, size: externallyManagedViewSize ?? view.bounds.size)
+        placeVideoLayer()
+        let deviceBounds = CGRect(origin: .zero, size: externallyManagedViewSize ?? view.bounds.size)
+        let bounds = externalStage.map { CGRect(origin: .zero, size: $0.bounds.size) } ?? deviceBounds
         guard bounds.width > 1, bounds.height > 1 else { return }
 
         let scale = renderScale()
@@ -784,7 +843,8 @@ final class MPVPlayerViewController: UIViewController {
         metalLayer.contentsScale = scale
         metalLayer.position = .zero
         metalLayer.bounds = CGRect(origin: .zero, size: bounds.size)
-        pictureInPictureController?.displayLayer.frame = bounds
+        pictureInPictureController?.displayLayer.frame = deviceBounds
+        remoteBackdrop?.frame = deviceBounds
         metalLayer.preferredDrawableSize = drawableSize
         let drawableSizeChanged = drawableSize != lastAppliedDrawableSize || metalLayer.drawableSize != drawableSize
         if drawableSizeChanged {
@@ -1083,10 +1143,11 @@ final class MPVPlayerViewController: UIViewController {
     // MARK: - Picture in Picture
 
     func isPictureInPictureSupported() -> Bool {
-        pictureInPictureController?.isSupported ?? false
+        !isOnExternalDisplay && (pictureInPictureController?.isSupported ?? false)
     }
 
     func startPictureInPicture() {
+        guard !isOnExternalDisplay else { return }
         pictureInPictureController?.start()
     }
 
@@ -1425,6 +1486,7 @@ final class MPVPlayerViewController: UIViewController {
                 return
             }
 
+            self.layoutPlayerSurfaces()   // Total Eclipse: the teardown took the video layer out
             self.reapplyRememberedSettings()
 
             guard let request = self.lastLoadRequest else {
@@ -1708,6 +1770,7 @@ final class MPVPlayerViewController: UIViewController {
             setNeedsStatusBarAppearanceUpdate()
             setNeedsUpdateOfHomeIndicatorAutoHidden()
             setNeedsUpdateOfScreenEdgesDeferringSystemGestures()
+            layoutPlayerSurfaces()
         }
     }
 
@@ -1952,7 +2015,7 @@ final class MPVPlayerViewController: UIViewController {
     private func updateStyledSubtitle() {
         guard mpv != nil else { return }
         let codec = getString("current-tracks/sub/codec") ?? ""
-        let styled = usesStyledSubtitles && SubtitleRendering.shared.supportsTextOverlay(codec: codec)
+        let styled = usesStyledSubtitles && !isOnExternalDisplay && SubtitleRendering.shared.supportsTextOverlay(codec: codec)
         if styled != styledSubtitleVisible {
             setStringProperty("sub-visibility", styled ? "no" : "yes")
             styledSubtitleVisible = styled
@@ -1968,6 +2031,10 @@ final class MPVPlayerViewController: UIViewController {
 
     func destroyPlayer() {
         guard !isPlayerDestroyed else { return }
+        TotalEclipseExternalDisplay.shared.release(self)
+        externalStage = nil
+        remoteBackdrop?.removeFromSuperview()
+        remoteBackdrop = nil
         Self.livePlayers.removeAll { $0.value == nil || $0.value === self }
         pictureInPictureController?.invalidate()
         pictureInPictureController = nil
@@ -2387,6 +2454,7 @@ final class MPVPlayerViewController: UIViewController {
             subtitle: subtitle,
             artworkUrl: artworkUrl
         )
+        updateRemoteBackdrop()
         publishNowPlayingForPlaybackSession()
     }
 
