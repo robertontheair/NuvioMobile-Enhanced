@@ -261,6 +261,7 @@ fun LiveTvScreen(
     // Total Eclipse: Live TV opens on Recently Watched, as on the Apple TVs; without any, on
     // Favorites, then the first category. Once per profile; after that it's your choice.
     val liveProfile = com.nuvio.app.features.profiles.ProfileRepository.state.collectAsStateWithLifecycle().value.activeProfile?.profileIndex ?: 0
+    var confirmClearRecents by remember { mutableStateOf(false) }
     var openedForProfile by rememberSaveable { mutableStateOf(-1) }
     LaunchedEffect(liveProfile, uiState.channels.isNotEmpty(), hasRecents, hasFavorites, categoryChips) {
         if (openedForProfile == liveProfile || uiState.channels.isEmpty()) return@LaunchedEffect
@@ -586,7 +587,6 @@ fun LiveTvScreen(
                                 selectedCategoryName = null
                                 onNowFilterName = null
                             },
-                            onClearRecents = LiveTvRepository::clearRecentChannels,
                             onFavoritesSelected = {
                                 filterMode = LiveTvChannelFilterMode.Favorites
                                 selectedCategoryName = null
@@ -847,9 +847,40 @@ fun LiveTvScreen(
                             onRemoveRecent = removeRecent,
                         )
                     }
+                    // Total Eclipse: Clear recents is after the list, and asks first.
+                    if (filterMode == LiveTvChannelFilterMode.Recents && onNowFilter == null &&
+                        searchQuery.isBlank() && visibleChannels.isNotEmpty()
+                    ) {
+                        item(key = "live-clear-recents") {
+                            Box(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                LiveTvPanelFilterChip(
+                                    label = stringResource(Res.string.live_tv_action_clear_recents),
+                                    selected = false,
+                                    onClick = { confirmClearRecents = true },
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
+
+        com.nuvio.app.core.ui.NuvioStatusModal(
+            title = "Clear Recents?",
+            message = "Removes every channel from Recents on this device. Your Apple TVs keep theirs.",
+            isVisible = confirmClearRecents,
+            destructive = true,
+            confirmText = "Clear",
+            dismissText = "Cancel",
+            onConfirm = {
+                confirmClearRecents = false
+                LiveTvRepository.clearRecentChannels()
+            },
+            onDismiss = { confirmClearRecents = false },
+        )
 
         val guideChannel = guideChannelId?.let { channelId -> uiState.channels.firstOrNull { it.id == channelId } }
         if (guideChannel != null) {
@@ -1097,7 +1128,6 @@ private fun LiveTvChannelControls(
     onOnNowSelected: (LiveTvOnNowFilter) -> Unit = {},
     onAllSelected: () -> Unit,
     onRecentsSelected: () -> Unit,
-    onClearRecents: () -> Unit,
     onFavoritesSelected: () -> Unit,
     onGroupSelected: (String) -> Unit,
 ) {
@@ -1132,13 +1162,6 @@ private fun LiveTvChannelControls(
                         onClick = onRecentsSelected,
                         count = counts.recents,
                     )
-                    if (filterMode == LiveTvChannelFilterMode.Recents) {
-                        LiveTvPanelFilterChip(
-                            label = stringResource(Res.string.live_tv_action_clear_recents),
-                            selected = false,
-                            onClick = onClearRecents,
-                        )
-                    }
                 }
                 if (showFavorites) {
                     LiveTvPanelFilterChip(
