@@ -144,7 +144,17 @@ object InAppLogger {
         syncLines(emptyList())
     }
 
+    // Total Eclipse: scrubbed copy on disk, and the previous session's lines first (see
+    // TotalEclipseLogPersistence; this buffer itself stays in memory as upstream intends).
+    private var restoredPrevious = false
+
     private fun appendEntry(entry: InAppLogEntry) {
+        if (!restoredPrevious) {
+            restoredPrevious = true
+            val previous = com.nuvio.app.totaleclipse.TotalEclipseLogPersistence.previousSession()
+            if (previous.isNotEmpty()) _entries.update { (previous + it).takeLast(maxLines) }
+        }
+        com.nuvio.app.totaleclipse.TotalEclipseLogPersistence.onEntry(entry)
         _entries.update { current ->
             val updated = if (current.size < maxLines) {
                 current + entry
