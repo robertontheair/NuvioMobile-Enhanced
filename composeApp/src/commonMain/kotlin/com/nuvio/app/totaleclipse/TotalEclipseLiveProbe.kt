@@ -27,11 +27,20 @@ internal object TotalEclipseLiveProbe {
         val type = response.headers.entries.firstOrNull { it.key.equals("Content-Type", ignoreCase = true) }?.value.orEmpty()
         val start = response.body.trimStart().take(64).lowercase()
         val dead = response.status >= 400 ||
+            (response.status in 200..299 && response.bodyBytes.isEmpty()) ||
             type.contains("html", ignoreCase = true) ||
             start.startsWith("<!doctype") || start.startsWith("<html")
         InAppLogger.info("TotalEclipse/Live", "probe after error: HTTP ${response.status}, ${type.substringBefore(';').ifBlank { "no type" }}, dead=$dead")
         return dead
     }
+
+    /**
+     * What to show for a live failure. Some dead feeds open and send nothing (ABC 10 WPLG): the
+     * player then says the stream ended at 0. Never the player's own technical text.
+     */
+    suspend fun explain(channelName: String, playerError: String, url: String, headers: Map<String, String>): String =
+        if (playerError.contains("ends prematurely at 0", ignoreCase = true) || looksDead(url, headers)) message(channelName)
+        else "$channelName couldn't be played right now. Try again, or pick another channel."
 
     fun message(channelName: String): String =
         "$channelName isn't broadcasting right now. The provider's feed for this channel is down. " +

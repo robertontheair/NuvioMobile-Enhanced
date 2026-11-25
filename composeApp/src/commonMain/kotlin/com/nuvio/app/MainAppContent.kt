@@ -1522,7 +1522,7 @@ internal fun MainAppContent(
             selectedContinueWatchingForActions = item
         }
 
-        val onLiveTvChannelClick: (LiveTvChannel) -> Unit = { channel ->
+        val playLiveChannel: (LiveTvChannel, Boolean) -> Unit = { channel, inLiveTvTab ->
             com.nuvio.app.totaleclipse.TotalEclipseLiveZap.played(channel)
             coroutineScope.launch {
                 val playableChannel = runCatching {
@@ -1546,9 +1546,10 @@ internal fun MainAppContent(
                         parentMetaType = "live",
                     ),
                 )
-                navController.navigate(PlayerRoute(launchId = launchId))
+                navController.navigate(PlayerRoute(launchId = launchId, inLiveTvTab = inLiveTvTab))
             }
         }
+        val onLiveTvChannelClick: (LiveTvChannel) -> Unit = { channel -> playLiveChannel(channel, false) }
 
         // Total Eclipse: channel up/down / Last Channel from the live player.
         LaunchedEffect(Unit) {
@@ -1573,7 +1574,7 @@ internal fun MainAppContent(
                 }
                 AppDeepLinkRepository.markConsumed(deepLink)
                 InAppLogger.info("App/DeepLink", "live channel ${if (channel != null) "found" else "not found"}")
-                if (channel != null) onLiveTvChannelClick(channel)
+                if (channel != null) playLiveChannel(channel, true)
             }
         }
 

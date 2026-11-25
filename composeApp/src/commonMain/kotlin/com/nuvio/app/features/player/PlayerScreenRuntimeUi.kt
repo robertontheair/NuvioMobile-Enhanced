@@ -852,8 +852,9 @@ private fun BoxScope.RenderPlaybackOverlays(
             val raw = errorMessage
             if (raw == null || !isLiveTvPlayback) { value = raw; return@produceState }
             value = null
-            val dead = com.nuvio.app.totaleclipse.TotalEclipseLiveProbe.looksDead(activeSourceUrl, activeSourceHeaders)
-            value = if (dead) com.nuvio.app.totaleclipse.TotalEclipseLiveProbe.message(activeStreamTitle.ifBlank { title }) else raw
+            value = com.nuvio.app.totaleclipse.TotalEclipseLiveProbe.explain(
+                activeStreamTitle.ifBlank { title }, raw, activeSourceUrl, activeSourceHeaders,
+            )
         }
         PlayerPlaybackOverlays(
             playerControlsLocked = playerControlsLocked,

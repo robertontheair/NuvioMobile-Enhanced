@@ -170,7 +170,11 @@ data class CatalogRoute(
 data class PlayerRoute(
     val launchId: Long,
     override val title: String = "",
+    /** Total Eclipse: a reminder's channel opens in the Live TV tab, so Back lands there. */
+    val inLiveTvTab: Boolean = false,
 ) : AppRoute {
     override val hidesNavigationBar: Boolean
         get() = true
+    override val preferredTabName: String?
+        get() = if (inLiveTvTab) "LiveTv" else null
 }
