@@ -406,6 +406,7 @@ object TraktProgressRepository {
             log.w { "Failed to refresh Trakt progress: ${error.message}" }
         }.getOrNull()
 
+        if (playbackEntries != null) com.nuvio.app.totaleclipse.TotalEclipseTraktOutbox.flush()
         if (playbackEntries == null) {
             if (!isLatestRefreshRequest(requestId)) return
             // The activity fingerprint already counts this change, so without clearing it the next

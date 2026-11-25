@@ -184,6 +184,12 @@ internal class PlayerScreenRuntime(
     var errorMessage by mutableStateOf<String?>(null)
     /** Total Eclipse: Live TV "Try Again" rebuilds the player when this changes. */
     var liveRetryCount by mutableStateOf(0)
+    /** Total Eclipse: a movie or season just finished; offer a rating. */
+    var totalEclipseRatingDue by mutableStateOf(false)
+    /** Total Eclipse: the last position seen playing (an error can reset the snapshot to 0). */
+    var lastPlayingPositionMs = 0L
+    /** Total Eclipse: when this title last moved to another source part way through. */
+    var midPlaybackSwitches = 0
     var isScrubbingTimeline by mutableStateOf(false)
     var isTouchingTimeline by mutableStateOf(false)
     var scrubbingPositionMs by mutableStateOf<Long?>(null)

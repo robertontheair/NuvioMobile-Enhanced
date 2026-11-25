@@ -27,6 +27,8 @@ internal fun PlayerEndTimeLabel(
     metrics: PlayerLayoutMetrics,
     modifier: Modifier = Modifier,
 ) {
+    // Total Eclipse: a live channel has no end.
+    if (com.nuvio.app.totaleclipse.LocalTotalEclipseLiveZap.current != null) return
     if (durationMs <= 0L) return
     val pausedTick by produceState(0, isPlaying) {
         if (!isPlaying) {

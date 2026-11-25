@@ -830,7 +830,15 @@ fun MetaDetailsScreen(
                     )
                 }
                 val chooseEpisodesText = stringResource(Res.string.shuffle_change_selection)
-                val playButtonLabel = remember(movieProgress, isMovieWatched, seriesAction, meta.type, hasEpisodes, playText, resumeText, watchAgainText, shufflePoolEmpty, chooseEpisodesText, meta.releasedDate) {
+                // Total Eclipse: "Resume S2 E5 · 18 min left".
+                val seriesProgressEntry = remember(watchProgressUiState.entries, seriesAction) {
+                    seriesAction?.takeIf { (it.resumePositionMs ?: 0L) > 0L }?.let { action ->
+                        watchProgressUiState.entries.firstOrNull {
+                            it.parentMetaId == meta.id && it.seasonNumber == action.seasonNumber && it.episodeNumber == action.episodeNumber
+                        }
+                    }
+                }
+                val playButtonLabel = remember(seriesProgressEntry, movieProgress, isMovieWatched, seriesAction, meta.type, hasEpisodes, playText, resumeText, watchAgainText, shufflePoolEmpty, chooseEpisodesText, meta.releasedDate) {
                     // Total Eclipse: an unreleased movie says when it comes out, as on the Apple TVs.
                     val comingDay = if (meta.type == "movie" && movieProgress == null) {
                         com.nuvio.app.totaleclipse.TotalEclipsePosterBadges.comingDay(meta.releasedDate)
@@ -841,9 +849,9 @@ fun MetaDetailsScreen(
                         comingDay != null -> "Coming $comingDay"
                         shufflePoolEmpty -> chooseEpisodesText
                         (meta.type == "series" || hasEpisodes) && seriesAction != null ->
-                            seriesAction.label
+                            seriesAction.label + com.nuvio.app.totaleclipse.timeLeftSuffix(seriesProgressEntry)
                         meta.type != "series" && !hasEpisodes && movieProgress != null ->
-                            resumeText
+                            resumeText + com.nuvio.app.totaleclipse.timeLeftSuffix(movieProgress)
                         isMovieWatched ->
                             watchAgainText
                         else -> playText

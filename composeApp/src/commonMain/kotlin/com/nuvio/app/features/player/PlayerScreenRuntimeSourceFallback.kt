@@ -30,7 +30,7 @@ internal fun PlayerScreenRuntime.playReplacementSource(stream: StreamItem, url: 
     }
     if (activeSourceUrl == autoSelectedSourceUrl) autoSelectedSourceUrl = url
     if (initialLoadCompleted) {
-        activeInitialPositionMs = playbackSnapshot.positionMs.coerceAtLeast(0L)
+        activeInitialPositionMs = playbackSnapshot.positionMs.takeIf { it > 0L } ?: lastPlayingPositionMs
         activeInitialProgressFraction = null
     }
     flushWatchProgress()
@@ -71,12 +71,16 @@ internal fun PlayerScreenRuntime.showErrorUnlessSourceFallback(message: String?)
  *
  * Returns `true` when a fallback was started and the error must not be shown yet.
  */
-internal fun PlayerScreenRuntime.tryFallbackToNextSourceAfterError(message: String?): Boolean {
+internal fun PlayerScreenRuntime.tryFallbackToNextSourceAfterError(
+    message: String?,
+    /** Total Eclipse: the source failed or became too slow part way through. */
+    midPlayback: Boolean = false,
+): Boolean {
     if (sourceFallbackJob?.isActive == true) return true
     val settings = playerSettingsUiState
     if (!settings.streamAutoPlayFallbackActive) return false
     if (!isIos && settings.autoSwitchPlaybackEngineOnError) return false
-    if (initialLoadCompleted) return false
+    if (initialLoadCompleted && !midPlayback) return false
     val failedUrl = activeSourceUrl
     if (failedUrl.isBlank() || failedUrl != autoSelectedSourceUrl) return false
     if (sourceFallbackAttempts >= settings.streamAutoPlayFallbackMaxSources) return false
@@ -131,12 +135,14 @@ internal fun PlayerScreenRuntime.tryFallbackToNextSourceAfterError(message: Stri
                     continue
                 }
                 log.i { "Source failed to start, falling back to ${playable.streamLabel} from ${playable.addonName}" }
+                if (midPlayback) midPlaybackSwitches++
                 playReplacementSource(playable, url, videoId)
                 return@launch
             }
         } finally {
             PlayerStreamsRepository.stopSourcesLoading()
         }
+        if (midPlayback && message == null) return@launch // only slow: it may still recover
         // The last source that failed may have been saved for reuse.
         removeFailedStreamFromCache()
         errorMessage = message

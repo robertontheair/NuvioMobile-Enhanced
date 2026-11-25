@@ -359,6 +359,7 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi(
                         checkAutoSubtitleRewindWatermark(snapshot.positionMs)
                         refreshAudioTracksIfChanged()
                         if (!snapshot.isLoading) initialLoadCompleted = true
+                        if (snapshot.isPlaying && snapshot.positionMs > 0L) lastPlayingPositionMs = snapshot.positionMs
                         if (snapshot.isEnded) {
                             shouldPlay = false
                             controlsVisible = !playerControlsLocked
@@ -369,7 +370,7 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi(
                         if (message != null && tryRefreshExpiredLinkAfterError(message)) {
                             return@PlatformPlayerSurface
                         }
-                        if (message != null && tryFallbackToNextSourceAfterError(message)) {
+                        if (message != null && tryFallbackToNextSourceAfterError(message, midPlayback = initialLoadCompleted && !isLiveTvPlayback)) {
                             return@PlatformPlayerSurface
                         }
                         // Engine failover is decided here, driven by its own player setting;
@@ -502,6 +503,11 @@ private fun PlayerScreenRuntime.RenderPlayerControls(
     val userRatingTarget = currentUserRatingTarget()
     val canRate = rememberCanRate(userRatingTarget)
     val userRating = rememberUserRating(userRatingTarget.takeIf { canRate })
+    LaunchedEffect(totalEclipseRatingDue) {
+        if (!totalEclipseRatingDue) return@LaunchedEffect
+        totalEclipseRatingDue = false
+        if (canRate && userRating == null) showUserRatingSheet = true
+    }
     val liveTvEpgNowMillis = rememberLiveTvEpgNowMillis()
     LaunchedEffect(isLiveTvPlayback) {
         if (isLiveTvPlayback) LiveTvRepository.ensureChannelsLoaded()
@@ -585,7 +591,7 @@ private fun PlayerScreenRuntime.RenderPlayerControls(
             onSeekForward = { seekBy(skipStepMs(PlayerSeekDirection.Forward)) },
             skipBackwardSeconds = playerSettingsUiState.skipBackwardSeconds,
             skipForwardSeconds = playerSettingsUiState.skipForwardSeconds,
-            showSkipButtons = playerSettingsUiState.showSkipButtons,
+            showSkipButtons = playerSettingsUiState.showSkipButtons && !isLiveTvPlayback,
             onResizeModeClick = { cycleResizeMode() },
             onSpeedClick = if (!isLiveTvPlayback) {
                 {
@@ -836,6 +842,8 @@ private fun BoxScope.RenderPlaybackOverlays(
                 delay(1_000L)
             }
         }
+        // Total Eclipse: a source too slow part way through, and live feeds that stop.
+        BindTotalEclipsePlaybackGuards()
         // Total Eclipse: channel up/down and Last Channel switch this player in place.
         DisposableEffect(isLiveTvPlayback) {
             val handler: (com.nuvio.app.features.livetv.LiveTvChannel) -> Unit = { switchToLiveChannel(it) }

@@ -71,7 +71,7 @@ data class PlayerSettingsUiState(
     val streamReuseLastLinkCacheHours: Int = 24,
     val androidPlaybackEngine: AndroidPlaybackEngine = AndroidPlaybackEngine.ExoPlayer,
     val autoSwitchPlaybackEngineOnError: Boolean = true,
-    val streamAutoPlayFallbackOnFailure: Boolean = false,
+    val streamAutoPlayFallbackOnFailure: Boolean = true, // Total Eclipse: on, as on the Apple TVs
     val streamAutoPlayFallbackMaxSources: Int = DEFAULT_SOURCE_FALLBACK_MAX_SOURCES,
     val streamAutoPlayFallbackStartupTimeoutSeconds: Int = DEFAULT_SOURCE_STARTUP_TIMEOUT_SECONDS,
     val androidLibmpvVideoOutput: AndroidLibmpvVideoOutput = AndroidLibmpvVideoOutput.GpuNext,
@@ -210,7 +210,7 @@ object PlayerSettingsRepository {
     private var streamReuseLastLinkCacheHours = 24
     private var androidPlaybackEngine = AndroidPlaybackEngine.ExoPlayer
     private var autoSwitchPlaybackEngineOnError = true
-    private var streamAutoPlayFallbackOnFailure = false
+    private var streamAutoPlayFallbackOnFailure = true
     private var streamAutoPlayFallbackMaxSources = DEFAULT_SOURCE_FALLBACK_MAX_SOURCES
     private var streamAutoPlayFallbackStartupTimeoutSeconds = DEFAULT_SOURCE_STARTUP_TIMEOUT_SECONDS
     private var androidLibmpvVideoOutput = AndroidLibmpvVideoOutput.GpuNext
@@ -334,7 +334,7 @@ object PlayerSettingsRepository {
         streamReuseLastLinkCacheHours = 24
         androidPlaybackEngine = AndroidPlaybackEngine.ExoPlayer
         autoSwitchPlaybackEngineOnError = true
-        streamAutoPlayFallbackOnFailure = false
+        streamAutoPlayFallbackOnFailure = true
         streamAutoPlayFallbackMaxSources = DEFAULT_SOURCE_FALLBACK_MAX_SOURCES
         streamAutoPlayFallbackStartupTimeoutSeconds = DEFAULT_SOURCE_STARTUP_TIMEOUT_SECONDS
         androidLibmpvVideoOutput = AndroidLibmpvVideoOutput.GpuNext
@@ -490,7 +490,7 @@ object PlayerSettingsRepository {
             ?.let { runCatching { AndroidPlaybackEngine.valueOf(it) }.getOrNull() }
             ?: AndroidPlaybackEngine.ExoPlayer
         autoSwitchPlaybackEngineOnError = PlayerSettingsStorage.loadAutoSwitchPlaybackEngineOnError() ?: true
-        streamAutoPlayFallbackOnFailure = PlayerSettingsStorage.loadStreamAutoPlayFallbackOnFailure() ?: false
+        streamAutoPlayFallbackOnFailure = PlayerSettingsStorage.loadStreamAutoPlayFallbackOnFailure() ?: true
         streamAutoPlayFallbackMaxSources = PlayerSettingsStorage.loadStreamAutoPlayFallbackMaxSources()
             ?.coerceIn(SOURCE_FALLBACK_MAX_SOURCES_RANGE)
             ?: DEFAULT_SOURCE_FALLBACK_MAX_SOURCES

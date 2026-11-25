@@ -288,6 +288,8 @@ internal object TraktScrobbleRepository : TrackingScrobbler {
                     delay(retryDelayMs * attempt)
                     continue
                 }
+                // Total Eclipse: keep a finished title for when Trakt answers again.
+                if (action == "stop") com.nuvio.app.totaleclipse.TotalEclipseTraktOutbox.addFinished(profileId, item, clampedProgress)
                 return
             }
 
@@ -327,6 +329,9 @@ internal object TraktScrobbleRepository : TrackingScrobbler {
             log.w {
                 "Failed Trakt scrobble $action: HTTP ${response.status} ${response.statusText.ifBlank { "<no-status-text>" }}"
             }
+            if (action == "stop" && (response.status == 429 || response.status >= 500)) {
+                com.nuvio.app.totaleclipse.TotalEclipseTraktOutbox.addFinished(profileId, item, clampedProgress)
+            }
             return
         }
 
@@ -341,6 +346,7 @@ internal object TraktScrobbleRepository : TrackingScrobbler {
         )
 
         if (action == "stop") {
+            com.nuvio.app.totaleclipse.TotalEclipseTraktOutbox.flush()
             runCatching { TraktProgressRepository.invalidateAndRefresh() }
                 .onFailure { error ->
                     if (error is CancellationException) throw error
