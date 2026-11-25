@@ -122,7 +122,9 @@ private const val HERO_SCROLL_UP_SCALE_MULTIPLIER = 0.002f
 private const val HERO_SCROLL_MAX_SCALE = 1.3f
 private const val HERO_SWIPE_THRESHOLD_FRACTION = 0.16f
 private const val HERO_SWIPE_VELOCITY_THRESHOLD = 300f
-private const val HERO_AUTO_SCROLL_INTERVAL_MS = 8_000L
+// Total Eclipse: 10 s per title, and it stops after showing them all twice (battery, Rob).
+private const val HERO_AUTO_SCROLL_INTERVAL_MS = 10_000L
+private const val HERO_AUTO_SCROLL_LOOPS = 2
 private const val MOBILE_HERO_VIEWPORT_RATIO = 0.82f
 private const val MOBILE_PORTRAIT_HERO_WIDTH_RATIO = 1.5f
 private const val MOBILE_HERO_MIN_HEIGHT_DP = 360f
@@ -247,13 +249,19 @@ internal fun HomeHeroSection(
         }
     }
 
-    ScreenActivityEffect(autoScrollPage, items.size, effectiveTrailerPlaybackEnabled) { active ->
+    // Total Eclipse: a touch on the banner restarts the wait, so a tap never lands as the banner
+    // moves on (it opened the next title). Automatic advances stop after two loops.
+    var heroTouchCount by remember { mutableStateOf(0) }
+    var autoAdvances by remember(items) { mutableStateOf(0) }
+    ScreenActivityEffect(autoScrollPage, items.size, effectiveTrailerPlaybackEnabled, heroTouchCount) { active ->
         if (!active || items.size <= 1 || effectiveTrailerPlaybackEnabled) return@ScreenActivityEffect
+        if (autoAdvances >= items.size * HERO_AUTO_SCROLL_LOOPS) return@ScreenActivityEffect
         delay(HERO_AUTO_SCROLL_INTERVAL_MS)
         while (pagerState.isScrollInProgress) {
             delay(100L)
         }
 
+        autoAdvances += 1
         val nextPage = pagerState.currentPage + 1
         pagerState.animateScrollToPage(nextPage)
     }
@@ -288,6 +296,7 @@ internal fun HomeHeroSection(
                     pagerState = pagerState,
                     itemCount = items.size,
                     coroutineScope = coroutineScope,
+                    onTouch = { heroTouchCount += 1 },
                 )
                 .clip(heroShape),
         ) {
@@ -1034,12 +1043,14 @@ private fun Modifier.homeHeroPagerGesture(
     pagerState: PagerState,
     itemCount: Int,
     coroutineScope: CoroutineScope,
+    onTouch: () -> Unit = {},
 ): Modifier {
     if (itemCount <= 1) return this
 
     return pointerInput(pagerState, itemCount) {
         awaitEachGesture {
             val down = awaitFirstDown(pass = PointerEventPass.Initial)
+            onTouch()
             val widthPx = size.width.toFloat().takeIf { it > 0f } ?: return@awaitEachGesture
             val velocityTracker = VelocityTracker().apply {
                 addPosition(down.uptimeMillis, down.position)
