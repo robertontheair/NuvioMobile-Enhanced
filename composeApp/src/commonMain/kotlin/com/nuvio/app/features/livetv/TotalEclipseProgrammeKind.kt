@@ -94,13 +94,34 @@ internal enum class LiveTvOnNowFilter(val label: String, val flag: Int) {
     New("New Episodes", TotalEclipseProgrammeKind.NEW),
 }
 
-/** Channels with a matching programme on at [atMillis], A to Z by name. */
+/**
+ * Channels with a matching programme on at [atMillis], A to Z by name, with the Apple TVs'
+ * placement (HomeTV HomeTVLiveGroups.filterPlacement): Kids & Family channels' films are left out
+ * of Movies; other cities' locals and international channels follow the rest in Sports, and in the
+ * other filters show only when you watch them (favourite or Recently Watched), after the rest.
+ */
 internal fun liveTvOnNow(
     channels: List<LiveTvChannel>,
     programs: Map<String, List<LiveTvEpgProgram>>,
     filter: LiveTvOnNowFilter,
     atMillis: Long,
-): List<LiveTvChannel> =
-    channels.filter { channel ->
-        programs[channel.id]?.any { it.isAiringAt(atMillis) && it.flags and filter.flag != 0 } == true
-    }.sortedBy { it.name.lowercase() }
+    watched: Set<String> = emptySet(),
+): List<LiveTvChannel> {
+    val keys = com.nuvio.app.totaleclipse.TotalEclipseLiveLayout.categoryKeyByChannel
+    val first = mutableListOf<LiveTvChannel>()
+    val later = mutableListOf<LiveTvChannel>()
+    for (channel in channels) {
+        if (programs[channel.id]?.any { it.isAiringAt(atMillis) && it.flags and filter.flag != 0 } != true) continue
+        val key = keys[channel.id]
+        if (filter == LiveTvOnNowFilter.Movies && key == com.nuvio.app.totaleclipse.TotalEclipseLiveGroups.KIDS_KEY) continue
+        val elsewhere = key != null && (
+            key.startsWith("\u0001smart.region.") ||
+                (key.startsWith("\u0001smart.local.") && key != com.nuvio.app.totaleclipse.TotalEclipseLiveGroups.HOME_MARKET_KEY)
+            )
+        when {
+            !elsewhere -> first += channel
+            filter == LiveTvOnNowFilter.Sports || channel.id in watched -> later += channel
+        }
+    }
+    return first.sortedBy { it.name.lowercase() } + later.sortedBy { it.name.lowercase() }
+}

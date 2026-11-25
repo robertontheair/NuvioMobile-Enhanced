@@ -58,6 +58,15 @@ object LiveTvRepository {
         publishNavigationVisibility()
     }
 
+    /** Total Eclipse: the channels as loaded, before the TVs' layout is applied. */
+    private var rawChannels: List<LiveTvChannel> = emptyList()
+
+    /** Total Eclipse: the TVs' Live TV layout changed; lay the channels out again. */
+    fun reapplyLayout() {
+        if (rawChannels.isEmpty() || _uiState.value.channels.isEmpty()) return
+        _uiState.value = _uiState.value.copy(channels = com.nuvio.app.totaleclipse.TotalEclipseLiveLayout.apply(rawChannels))
+    }
+
     fun ensureChannelsLoaded() {
         ensureLoaded()
         if (channelsRequested) return
@@ -73,8 +82,9 @@ object LiveTvRepository {
             if (cachedChannels != null && liveTvChannelSourceSignature(_uiState.value) == signature) {
                 detectedEpgUrls = cachedChannels.epgUrls
                 channelsSignature = signature
+                rawChannels = cachedChannels.channels
                 _uiState.value = _uiState.value.copy(
-                    channels = cachedChannels.channels,
+                    channels = com.nuvio.app.totaleclipse.TotalEclipseLiveLayout.apply(cachedChannels.channels),
                     isLoading = false,
                     errorMessage = null,
                 )
@@ -395,16 +405,17 @@ object LiveTvRepository {
             )
 
             val fetchedChannels = withContext(Dispatchers.Default) { loadedChannels.distinctBy { it.streamUrl } }
-            val previousChannels = _uiState.value.channels
+            val previousChannels = rawChannels // Total Eclipse: before the TVs' layout
             val keepPrevious = fetchedChannels.isEmpty() &&
                 failedPlaylistNames.isNotEmpty() &&
                 previousChannels.isNotEmpty() &&
                 channelsSignature == signature
             val channels = if (keepPrevious) previousChannels else fetchedChannels
+            rawChannels = channels
             _uiState.value = _uiState.value.copy(
                 playlistUrl = playlists.firstEnabledUrlSource(),
                 playlists = playlists,
-                channels = channels,
+                channels = com.nuvio.app.totaleclipse.TotalEclipseLiveLayout.apply(channels),
                 isLoading = false,
                 errorMessage = when {
                     channels.isEmpty() && failedPlaylistNames.isNotEmpty() -> "Playlist could not be loaded."

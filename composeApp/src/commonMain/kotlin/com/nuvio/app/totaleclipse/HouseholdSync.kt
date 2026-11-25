@@ -221,6 +221,13 @@ internal object HouseholdSync {
         // Live TV favourites and Recently Watched: the TVs' dated logs, merged into the phone's.
         val profileSettings = HouseholdCloudStore.stringSettings(TV_PROFILE_SETTINGS_PREFIX + tvId)
         val logs = profileSettings[TotalEclipseLiveSync.TV_FAVORITES_LOG] to profileSettings[TotalEclipseLiveSync.TV_RECENTS_LOG]
+        // The TVs' Live TV layout (the primary profile's until this one has its own).
+        val layoutText = profileSettings[TotalEclipseLiveLayout.TV_KEY]
+            ?: HouseholdCloudStore.stringSettings(TV_PROFILE_SETTINGS_PREFIX + TV_PRIMARY_PROFILE_ID)[TotalEclipseLiveLayout.TV_KEY]
+        if (TotalEclipseLiveLayout.update(layoutText)) {
+            InAppLogger.info(TAG, "$reason: Live TV layout from TV '$tvId' (${layoutText?.length ?: 0} chars)")
+            com.nuvio.app.features.livetv.LiveTvRepository.reapplyLayout()
+        }
         if (logs != liveLogs) {
             liveLogs = logs
             if (com.nuvio.app.features.livetv.LiveTvRepository.uiState.value.channels.isNotEmpty()) {

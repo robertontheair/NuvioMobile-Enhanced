@@ -220,11 +220,13 @@ fun LiveTvScreen(
             searchQuery = searchQuery,
             uncategorizedGroupName = uncategorizedLabel,
         )
-        if (onNowFilter == null) filtered else liveTvOnNow(filtered, uiState.epgPrograms, onNowFilter, guideShownMillis)
+        if (onNowFilter == null) filtered
+        else liveTvOnNow(filtered, uiState.epgPrograms, onNowFilter, guideShownMillis, uiState.favoriteChannelIds + uiState.recentChannelIds)
     }
     // Total Eclipse: On Now chips that have channels right now (at the time the guide shows).
-    val onNowCounts = remember(uiState.channels, uiState.epgPrograms, guideShownMillis / 60_000L) {
-        LiveTvOnNowFilter.entries.associateWith { liveTvOnNow(uiState.channels, uiState.epgPrograms, it, guideShownMillis).size }
+    val onNowCounts = remember(uiState.channels, uiState.epgPrograms, guideShownMillis / 60_000L, uiState.favoriteChannelIds, uiState.recentChannelIds) {
+        val watched = uiState.favoriteChannelIds + uiState.recentChannelIds
+        LiveTvOnNowFilter.entries.associateWith { liveTvOnNow(uiState.channels, uiState.epgPrograms, it, guideShownMillis, watched).size }
             .filterValues { it > 0 }
     }
 

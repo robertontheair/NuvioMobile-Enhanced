@@ -61,8 +61,28 @@ internal object TotalEclipseLiveGroups {
     private val orderedTitles: List<String> =
         types.map { it.title } + markets.map { it.title } + OTHER_LOCAL + international.map { it.second } + LIVE_EVENTS
 
-    fun rank(category: String): Int = orderedTitles.indexOfFirst { it.equals(category, ignoreCase = true) }
+    fun rank(category: String): Int = TotalEclipseLiveLayout.rank(category)
+        ?: orderedTitles.indexOfFirst { it.equals(category, ignoreCase = true) }
+            .let { if (it < 0) Int.MAX_VALUE else it }
+
+    /** The default order only (for laying out the TVs' arrangement). */
+    fun defaultRank(category: String): Int = orderedTitles.indexOfFirst { it.equals(category, ignoreCase = true) }
         .let { if (it < 0) Int.MAX_VALUE else it }
+
+    /**
+     * The Apple TVs' key for a category title (HomeTVLiveGroups): "\u0001smart.type.news",
+     * "\u0001smart.local.miami", "\u0001smart.region.CA"…; a provider group keeps its name.
+     */
+    fun tvKey(title: String): String {
+        types.firstOrNull { it.title == title }?.let { return "\u0001smart.type.${it.id}" }
+        markets.firstOrNull { it.title == title }?.let { return "\u0001smart.local.${it.id}" }
+        if (title == OTHER_LOCAL) return "\u0001smart.local.other"
+        international.firstOrNull { it.second == title }?.let { return "\u0001smart.region.${it.first}" }
+        return title
+    }
+
+    const val HOME_MARKET_KEY = "\u0001smart.local.miami"
+    const val KIDS_KEY = "\u0001smart.type.kids"
 
     /**
      * [labels] holds each channel's `hometv-*` attributes, by channel id. Returns the channels
