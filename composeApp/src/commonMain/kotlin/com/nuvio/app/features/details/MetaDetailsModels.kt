@@ -14,6 +14,8 @@ data class MetaDetails(
     val logo: String? = null,
     val description: String? = null,
     val releaseInfo: String? = null,
+    // Total Eclipse: the meta's own "released" date, for "Coming Dec 18" on unreleased movies.
+    val releasedDate: String? = null,
     val lastAirDate: String? = null,
     val status: String? = null,
     val imdbRating: String? = null,

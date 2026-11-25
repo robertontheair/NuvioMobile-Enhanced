@@ -830,8 +830,15 @@ fun MetaDetailsScreen(
                     )
                 }
                 val chooseEpisodesText = stringResource(Res.string.shuffle_change_selection)
-                val playButtonLabel = remember(movieProgress, isMovieWatched, seriesAction, meta.type, hasEpisodes, playText, resumeText, watchAgainText, shufflePoolEmpty, chooseEpisodesText) {
+                val playButtonLabel = remember(movieProgress, isMovieWatched, seriesAction, meta.type, hasEpisodes, playText, resumeText, watchAgainText, shufflePoolEmpty, chooseEpisodesText, meta.releasedDate) {
+                    // Total Eclipse: an unreleased movie says when it comes out, as on the Apple TVs.
+                    val comingDay = if (meta.type == "movie" && movieProgress == null) {
+                        com.nuvio.app.totaleclipse.TotalEclipsePosterBadges.comingDay(meta.releasedDate)
+                    } else {
+                        null
+                    }
                     when {
+                        comingDay != null -> "Coming $comingDay"
                         shufflePoolEmpty -> chooseEpisodesText
                         (meta.type == "series" || hasEpisodes) && seriesAction != null ->
                             seriesAction.label

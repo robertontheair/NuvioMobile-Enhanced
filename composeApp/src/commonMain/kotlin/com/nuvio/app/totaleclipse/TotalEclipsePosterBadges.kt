@@ -42,6 +42,17 @@ internal object TotalEclipsePosterBadges {
         return if (year > today.year) "COMING $year" else null
     }
 
+    /** "Dec 18" (or "Dec 18, 2027") for a date after today, else null. Only the day counts. */
+    fun comingDay(raw: String?): String? {
+        val text = raw?.trim().orEmpty()
+        if (text.length < 10) return null
+        val today = runCatching { kotlin.time.Clock.System.todayIn(TimeZone.currentSystemDefault()) }.getOrNull() ?: return null
+        val date = runCatching { LocalDate.parse(text.take(10)) }.getOrNull() ?: return null
+        if (date <= today) return null
+        val month = months[date.month.ordinal].lowercase().replaceFirstChar { it.uppercase() }
+        return if (date.year == today.year) "$month ${date.day}" else "$month ${date.day}, ${date.year}"
+    }
+
     const val TOP10_PREFIX = "totaleclipse_top10"
 }
 
