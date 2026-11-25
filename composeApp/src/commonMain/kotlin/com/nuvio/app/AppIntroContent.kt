@@ -13,7 +13,9 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -39,24 +41,7 @@ internal const val AppIntroMinDurationMs = 1300L
 internal fun AppIntroContent(modifier: Modifier = Modifier) {
     val wordmarkAlpha = remember { Animatable(0f) }
     val wordmarkScale = remember { Animatable(0.55f) }
-    val glowAlpha = remember { Animatable(0f) }
-
-    val driftAngle by rememberInfiniteTransition(label = "intro_glow_drift").animateFloat(
-        initialValue = 0f,
-        targetValue = (2 * kotlin.math.PI).toFloat(),
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 7000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart,
-        ),
-        label = "intro_glow_drift_angle",
-    )
-    val density = LocalDensity.current
-    val driftRadiusPx = with(density) { 36.dp.toPx() }
-
     LaunchedEffect(Unit) {
-        launch {
-            glowAlpha.animateTo(1f, tween(durationMillis = 600, easing = FastOutSlowInEasing))
-        }
         launch {
             wordmarkAlpha.animateTo(1f, tween(durationMillis = 350, easing = FastOutSlowInEasing))
         }
@@ -75,29 +60,12 @@ internal fun AppIntroContent(modifier: Modifier = Modifier) {
             .background(MaterialTheme.nuvio.colors.background),
         contentAlignment = Alignment.Center,
     ) {
-        val accent = MaterialTheme.nuvio.colors.accent
-        Box(
-            modifier = Modifier
-                .size(190.dp)
-                .graphicsLayer {
-                    alpha = glowAlpha.value
-                    translationX = cos(driftAngle) * driftRadiusPx
-                    translationY = sin(driftAngle) * driftRadiusPx * 0.6f
-                }
-                .background(
-                    brush = Brush.radialGradient(
-                        colorStops = arrayOf(
-                            0.0f to accent.copy(alpha = 0.28f),
-                            0.35f to accent.copy(alpha = 0.14f),
-                            0.7f to accent.copy(alpha = 0.03f),
-                            1.0f to Color.Transparent,
-                        ),
-                    ),
-                ),
-        )
         AppBrandWordmark(
+            large = true,
             modifier = Modifier
-                .height(52.dp)
+                .widthIn(max = 640.dp)
+                .fillMaxWidth(0.86f)
+                .aspectRatio(com.nuvio.app.features.settings.TotalEclipseLogoAspect)
                 .graphicsLayer {
                     alpha = wordmarkAlpha.value
                     scaleX = wordmarkScale.value

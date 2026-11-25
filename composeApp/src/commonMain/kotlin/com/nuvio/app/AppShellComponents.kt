@@ -614,8 +614,9 @@ internal fun AppLoadingContent(
                     AppBrandWordmark(
                         contentDescription = stringResource(Res.string.app_brand_name),
                         modifier = emblemModifier
-                            .width(160.dp)
-                            .height(44.dp),
+                            .width(300.dp)
+                            .height(122.dp),
+                        large = true,
                     )
                 }
             }

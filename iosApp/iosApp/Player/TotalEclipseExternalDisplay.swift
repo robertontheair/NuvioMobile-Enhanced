@@ -76,28 +76,52 @@ final class TotalEclipseExternalDisplay {
 
     final class StageView: UIView {
         var onLayout: (() -> Void)?
-        private let title = UILabel()
+        private let logo = UIImageView(image: UIImage(named: "TotalEclipseLogo.png"))
+        private var driftTimer: Timer?
+        private var idleSince = Date()
+        private var driftStep = 0
 
         override init(frame: CGRect) {
             super.init(frame: frame)
             backgroundColor = .black
             clipsToBounds = true
-            title.attributedText = NSAttributedString(string: "TOTAL ECLIPSE", attributes: [
-                .kern: 12, .font: UIFont.systemFont(ofSize: 44, weight: .light),
-                .foregroundColor: UIColor(white: 1, alpha: 0.55)
-            ])
-            title.textAlignment = .center
-            addSubview(title)
+            logo.contentMode = .scaleAspectFit
+            addSubview(logo)
+            // Kind to OLED TVs: the logo drifts, and dims after five minutes.
+            driftTimer = Timer.scheduledTimer(withTimeInterval: 20, repeats: true) { [weak self] _ in self?.drift() }
+        }
+
+        deinit { driftTimer?.invalidate() }
+
+        private func drift() {
+            guard !logo.isHidden else { return }
+            driftStep += 1
+            let angle = Double(driftStep) * 2.4
+            UIView.animate(withDuration: 18, delay: 0, options: [.curveEaseInOut, .beginFromCurrentState]) {
+                self.logo.transform = CGAffineTransform(
+                    translationX: cos(angle) * self.bounds.width * 0.03,
+                    y: sin(angle) * self.bounds.height * 0.05
+                )
+                self.logo.alpha = Date().timeIntervalSince(self.idleSince) > 300 ? 0.35 : 1
+            }
         }
 
         @available(*, unavailable)
         required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
-        func setPlaying(_ playing: Bool) { title.isHidden = playing }
+        func setPlaying(_ playing: Bool) {
+            if !playing, logo.isHidden {
+                idleSince = Date()
+                logo.alpha = 1
+            }
+            logo.isHidden = playing
+        }
 
         override func layoutSubviews() {
             super.layoutSubviews()
-            title.frame = bounds
+            let width = bounds.width * 0.52
+            logo.bounds = CGRect(x: 0, y: 0, width: width, height: width * 1004 / 2472)
+            logo.center = CGPoint(x: bounds.midX, y: bounds.midY)
             onLayout?()
         }
     }
@@ -209,4 +233,109 @@ final class TotalEclipseRemoteBackdrop: UIView {
         }
         task?.resume()
     }
+}
+
+/// Browsing while the video plays on a connected display: what's playing, play/pause and stop.
+/// Tapping it opens the player's controls again.
+@MainActor
+final class TotalEclipseRemoteBar: UIView {
+    private weak var player: MPVPlayerViewController?
+    private let title = UILabel()
+    private let subtitle = UILabel()
+    private let playButton = UIButton(type: .system)
+    private let closeButton = UIButton(type: .system)
+    private var timer: Timer?
+
+    init(player: MPVPlayerViewController) {
+        self.player = player
+        super.init(frame: .zero)
+        backgroundColor = UIColor(white: 0.13, alpha: 0.97)
+        layer.cornerRadius = 18
+        layer.cornerCurve = .continuous
+        layer.borderWidth = 1
+        layer.borderColor = UIColor(white: 1, alpha: 0.12).cgColor
+        title.font = .systemFont(ofSize: 15, weight: .semibold)
+        title.textColor = .white
+        subtitle.font = .systemFont(ofSize: 12)
+        subtitle.textColor = UIColor(white: 1, alpha: 0.6)
+        subtitle.text = "Playing on the connected TV"
+        for (button, symbol, label) in [(closeButton, "xmark", "Stop"), (playButton, "pause.fill", "Pause")] {
+            button.setImage(UIImage(systemName: symbol), for: .normal)
+            button.tintColor = .white
+            button.accessibilityLabel = label
+        }
+        playButton.addTarget(self, action: #selector(togglePlay), for: .touchUpInside)
+        closeButton.addTarget(self, action: #selector(stop), for: .touchUpInside)
+        addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(open)))
+        let text = UIStackView(arrangedSubviews: [title, subtitle])
+        text.axis = .vertical
+        text.spacing = 2
+        text.isUserInteractionEnabled = false
+        let row = UIStackView(arrangedSubviews: [text, playButton, closeButton])
+        row.alignment = .center
+        row.spacing = 4
+        row.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(row)
+        NSLayoutConstraint.activate([
+            row.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 18),
+            row.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
+            row.topAnchor.constraint(equalTo: topAnchor),
+            row.bottomAnchor.constraint(equalTo: bottomAnchor),
+            playButton.widthAnchor.constraint(equalToConstant: 48),
+            playButton.heightAnchor.constraint(equalToConstant: 48),
+            closeButton.widthAnchor.constraint(equalToConstant: 44),
+            closeButton.heightAnchor.constraint(equalToConstant: 48),
+            heightAnchor.constraint(equalToConstant: 60)
+        ])
+        playButton.setContentCompressionResistancePriority(.required, for: .horizontal)
+        title.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        text.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        refresh()
+        timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refresh() }
+        }
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    func attach(to window: UIWindow) {
+        translatesAutoresizingMaskIntoConstraints = false
+        window.addSubview(self)
+        let full = widthAnchor.constraint(equalTo: window.widthAnchor, constant: -32)
+        full.priority = .defaultHigh
+        NSLayoutConstraint.activate([
+            full,
+            widthAnchor.constraint(lessThanOrEqualToConstant: 520),
+            centerXAnchor.constraint(equalTo: window.centerXAnchor),
+            // Above the tab bar.
+            bottomAnchor.constraint(equalTo: window.safeAreaLayoutGuide.bottomAnchor, constant: -84)
+        ])
+    }
+
+    func remove() {
+        timer?.invalidate()
+        timer = nil
+        removeFromSuperview()
+    }
+
+    private func refresh() {
+        guard let player else { return }
+        title.text = player.nowPlayingTitle ?? "Now playing"
+        playButton.setImage(UIImage(systemName: player.isPlayerPlaying ? "pause.fill" : "play.fill"), for: .normal)
+        playButton.accessibilityLabel = player.isPlayerPlaying ? "Pause" : "Play"
+    }
+
+    @objc private func togglePlay() {
+        guard let player else { return }
+        if player.isPlayerPlaying { player.pausePlayback() } else { player.playPlayback() }
+        refresh()
+    }
+
+    @objc private func open() {
+        guard let player else { return }
+        _ = PlayerPictureInPictureParking.shared.restore(player: player) { _ in }
+    }
+
+    @objc private func stop() { PlayerPictureInPictureParking.shared.closeParked() }
 }

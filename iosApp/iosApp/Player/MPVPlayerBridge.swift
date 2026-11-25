@@ -832,12 +832,17 @@ final class MPVPlayerViewController: UIViewController {
     @objc private func externalDisplayChanged() {
         guard isViewLoaded, !isPlayerDestroyed else { return }
         layoutPlayerSurfaces()
+        if externalStage == nil { PlayerPictureInPictureParking.shared.displayDisconnected(player: self) }
     }
+
+    var nowPlayingTitle: String? { cachedNowPlayingMetadata?.title }
 
     /// Puts the video on the connected display when there is one (not for previews), else here.
     private func placeVideoLayer() {
         guard !isPlayerDestroyed else { return }
-        let stage = isEmbeddedPreviewMode || PlayerPictureInPictureParking.shared.isParked(player: self)
+        let parking = PlayerPictureInPictureParking.shared
+        let parkedInWindow = parking.isParked(player: self) && !parking.isBrowsing(player: self)
+        let stage = isEmbeddedPreviewMode || parkedInWindow
             ? nil : TotalEclipseExternalDisplay.shared.claim(for: self)
         CATransaction.begin()
         CATransaction.setDisableActions(true)
@@ -1201,11 +1206,15 @@ final class MPVPlayerViewController: UIViewController {
     // MARK: - Picture in Picture
 
     func isPictureInPictureSupported() -> Bool {
-        !isOnExternalDisplay && (pictureInPictureController?.isSupported ?? false)
+        isOnExternalDisplay || (pictureInPictureController?.isSupported ?? false)
     }
 
     func startPictureInPicture() {
-        guard !isOnExternalDisplay else { return }
+        // Total Eclipse: the video is on a connected display, so the device is free to browse.
+        if isOnExternalDisplay {
+            PlayerPictureInPictureParking.shared.park(player: self, browsing: true)
+            return
+        }
         pictureInPictureController?.start()
     }
 

@@ -49,7 +49,9 @@ final class PlayerPictureInPictureController: NSObject,
 
     private var isParked: Bool {
         guard let owner else { return false }
-        return MainActor.assumeIsolated { PlayerPictureInPictureParking.shared.isParked(player: owner) }
+        return MainActor.assumeIsolated {
+            PlayerPictureInPictureParking.shared.isParked(player: owner) && !PlayerPictureInPictureParking.shared.isBrowsing(player: owner)
+        }
     }
 
     private func cancelInlinePresentationWait() {

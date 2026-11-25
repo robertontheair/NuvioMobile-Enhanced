@@ -247,7 +247,8 @@ internal fun PlayerControlActions(
             stringResource(resizeMode.labelRes), onResizeModeClick,
             painter = appIconPainter(AppIconResource.PlayerAspectRatio),
         )
-        this[PlayerToolbarButton.SUBTITLES] = PlayerControlAction(
+        // Total Eclipse: live channels have no subtitle choice.
+        if (com.nuvio.app.totaleclipse.LocalTotalEclipseLiveZap.current == null) this[PlayerToolbarButton.SUBTITLES] = PlayerControlAction(
             stringResource(Res.string.compose_player_subtitles), onSubtitleClick,
             painter = appIconPainter(AppIconResource.PlayerSubtitles),
         )
@@ -480,10 +481,10 @@ internal fun playerControlActions(
                 icon = Icons.Rounded.SkipNext, iconSize = 40.dp,
             )
         },
-        PlayerControlAction(
+        if (com.nuvio.app.totaleclipse.LocalTotalEclipseLiveZap.current == null) PlayerControlAction(
             stringResource(Res.string.compose_player_subtitles), onSubtitleClick,
             painter = appIconPainter(AppIconResource.PlayerSubtitles),
-        ),
+        ) else null,
         PlayerControlAction(
             stringResource(Res.string.compose_player_audio), onAudioClick,
             painter = appIconPainter(AppIconResource.PlayerAudioFilled),

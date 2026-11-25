@@ -11,7 +11,10 @@ final class PlayerPictureInPictureParking {
         let content: UIViewController
         weak var coordinator: TabNavigationCoordinator?
         weak var player: MPVPlayerViewController?
+        var browsing = false   // Total Eclipse: the video is on a connected display
     }
+
+    private var remoteBar: TotalEclipseRemoteBar?
 
     weak var appCoordinator: AppNavigationCoordinator?
 
@@ -31,8 +34,19 @@ final class PlayerPictureInPictureParking {
         return parked.player === player
     }
 
+    /// Total Eclipse: the player is parked while its video plays on a connected display.
+    func isBrowsing(player: MPVPlayerViewController) -> Bool {
+        isParked(player: player) && parked?.browsing == true
+    }
+
+    /// Total Eclipse: the display went away; the player comes back to the device's screen.
+    func displayDisconnected(player: MPVPlayerViewController) {
+        guard isBrowsing(player: player) else { return }
+        _ = restore(player: player) { _ in }
+    }
+
     @discardableResult
-    func park(player: MPVPlayerViewController) -> Bool {
+    func park(player: MPVPlayerViewController, browsing: Bool = false) -> Bool {
         guard parked == nil else { return false }
         var candidate: UIViewController? = player
         while let current = candidate, !(current.parent is PlayerRouteContainerViewController) {
@@ -50,7 +64,12 @@ final class PlayerPictureInPictureParking {
         content.view.frame = host.bounds
         content.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
 
-        parked = Parked(route: container.route, content: content, coordinator: coordinator, player: player)
+        parked = Parked(route: container.route, content: content, coordinator: coordinator, player: player, browsing: browsing)
+        if browsing {
+            let bar = TotalEclipseRemoteBar(player: player)
+            bar.attach(to: window)
+            remoteBar = bar
+        }
         player.setParkedInPictureInPicture(true)
         OrientationLockCoordinator.shared.setParkedPlayerSuspension(true)
         AppKt.setPlayerParkedInPictureInPicture(parked: true)
@@ -89,6 +108,7 @@ final class PlayerPictureInPictureParking {
     func unpark(route: AppRoute, into container: PlayerRouteContainerViewController) -> Bool {
         guard let parked, parked.route === route else { return false }
         self.parked = nil
+        removeRemoteBar()
         container.embed(parked.content)
         (parked.content as? RootComposeViewController)?.restoreAfterPictureInPictureParking()
         OrientationLockCoordinator.shared.setParkedPlayerSuspension(false)
@@ -106,6 +126,7 @@ final class PlayerPictureInPictureParking {
     func closeParked() {
         guard let parked else { return }
         self.parked = nil
+        removeRemoteBar()
         finishPendingRestore(false)
         parked.player?.pausePlayback()
         parked.player?.endPictureInPictureSession()
@@ -117,6 +138,11 @@ final class PlayerPictureInPictureParking {
             OrientationLockCoordinator.shared.setParkedPlayerSuspension(false)
         }
         InAppLogBridge.shared.info(tag: "Player/PiP", message: "parked player closed")
+    }
+
+    private func removeRemoteBar() {
+        remoteBar?.remove()
+        remoteBar = nil
     }
 
     private func finishPendingRestore(_ restored: Bool) {

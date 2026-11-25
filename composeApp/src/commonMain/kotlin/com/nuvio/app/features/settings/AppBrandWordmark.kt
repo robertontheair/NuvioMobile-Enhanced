@@ -22,6 +22,8 @@ import kotlinx.coroutines.withContext
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.ResourceEnvironment
 import org.jetbrains.compose.resources.decodeToImageBitmap
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.total_eclipse_logo
 import org.jetbrains.compose.resources.getDrawableResourceBytes
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.rememberResourceEnvironment
@@ -31,8 +33,9 @@ internal fun AppBrandWordmark(
     modifier: Modifier = Modifier,
     contentDescription: String? = null,
     icon: AppIconOption? = null,
+    large: Boolean = false,   // Total Eclipse: the full-size logo
 ) {
-    val resource = rememberAppBrandWordmarkResource(icon)
+    val resource = if (large) Res.drawable.total_eclipse_logo else rememberAppBrandWordmarkResource(icon)
     val environment = rememberResourceEnvironment()
 
     Crossfade(
@@ -64,8 +67,12 @@ internal fun PreloadAppBrandWordmark() {
     val environment = rememberResourceEnvironment()
     LaunchedEffect(resource, environment) {
         AppBrandWordmarkCache.load(resource, environment)
+        AppBrandWordmarkCache.load(Res.drawable.total_eclipse_logo, environment)
     }
 }
+
+/** Total Eclipse: width over height of the full-size logo (with its glow). */
+internal const val TotalEclipseLogoAspect = 2472f / 1004f
 
 @Composable
 private fun rememberAppBrandWordmarkResource(icon: AppIconOption?): DrawableResource {

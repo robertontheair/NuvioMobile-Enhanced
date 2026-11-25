@@ -8,6 +8,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -217,8 +218,10 @@ fun ProfileSelectionScreen(
                 // tap→center transition, while everything underneath fades away.
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     AppBrandWordmark(
+                        large = true,
                         modifier = Modifier
-                            .height(if (isTabletLayout) 42.dp else 34.dp)
+                            .height(if (isTabletLayout) 170.dp else 112.dp)
+                            .aspectRatio(com.nuvio.app.features.settings.TotalEclipseLogoAspect)
                             .graphicsLayer {
                                 alpha = titleAlpha.value
                                 translationY = titleOffset.value

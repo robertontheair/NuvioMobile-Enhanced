@@ -208,6 +208,7 @@ fun LiveTvScreen(
         selectedCategoryName,
         searchQuery,
         uncategorizedLabel,
+        categoryOptions,
         onNowFilter,
         uiState.epgPrograms,
         guideShownMillis / 60_000L,
@@ -222,10 +223,16 @@ fun LiveTvScreen(
             uncategorizedGroupName = uncategorizedLabel,
         )
         if (onNowFilter == null) {
-            // Total Eclipse: event slots after the real channels in All Channels.
+            // Total Eclipse: All Channels in category order, as the chips are; event slots last.
             if (filterMode != LiveTvChannelFilterMode.All || searchQuery.isNotBlank()) filtered
-            else filtered.partition { it.group != com.nuvio.app.totaleclipse.TotalEclipseLiveGroups.LIVE_EVENTS }
-                .let { (channels, events) -> channels + events }
+            else {
+                val ranks = categoryOptions.filter { it.mode == LiveTvChannelFilterMode.Category }
+                    .mapIndexedNotNull { index, option -> option.categoryName?.lowercase()?.let { it to index } }.toMap()
+                filtered.sortedBy { channel ->
+                    if (channel.group == com.nuvio.app.totaleclipse.TotalEclipseLiveGroups.LIVE_EVENTS) Int.MAX_VALUE
+                    else ranks[channel.group?.takeIf { it.isNotBlank() }?.lowercase()] ?: (Int.MAX_VALUE - 1)
+                }
+            }
         }
         else liveTvOnNow(filtered, uiState.epgPrograms, onNowFilter, guideShownMillis, uiState.favoriteChannelIds + uiState.recentChannelIds)
     }
