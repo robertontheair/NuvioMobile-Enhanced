@@ -103,12 +103,30 @@ internal fun parseXmltvGuide(
         if (stopMillis != null && stopMillis < windowStartMillis) continue
         val body = xml.substring(tagEnd + 1, close)
         val title = readXmlElementTexts(body, "title", limit = 1).firstOrNull() ?: continue
+        val description = readXmlElementTexts(body, "desc", limit = 1).firstOrNull()
+        val categories = readXmlElementTexts(body, "category", limit = 6)
+        val episodeNum = readXmlElementTexts(body, "episode-num", limit = 1).firstOrNull()
+        val subtitle = readXmlElementTexts(body, "sub-title", limit = 1).firstOrNull()
+        val rating = body.indexOf("<rating").takeIf { it >= 0 }
+            ?.let { readXmlElementTexts(body.substring(it), "value", limit = 1).firstOrNull() }
         programs.getOrPut(liveTvEpgKey(channel)) { mutableListOf() } += LiveTvEpgProgram(
             title = title,
             startMillis = startMillis,
             endMillis = stopMillis ?: -1L,
-            description = readXmlElementTexts(body, "desc", limit = 1).firstOrNull(),
-            category = readXmlElementTexts(body, "category", limit = 1).firstOrNull(),
+            description = description,
+            category = categories.firstOrNull(),
+            // Total Eclipse: programme kind for the "On Now" filters, with the Apple TVs' rules.
+            flags = TotalEclipseProgrammeKind.classify(
+                categories = categories,
+                premiere = "<premiere" in body,
+                previouslyShown = "<previously-shown" in body,
+                rating = rating,
+                episodeNum = episodeNum,
+                subtitle = subtitle,
+                descriptionHead = description,
+                title = title,
+                minutes = stopMillis?.let { (it - startMillis) / 60_000.0 },
+            ),
         )
     }
 

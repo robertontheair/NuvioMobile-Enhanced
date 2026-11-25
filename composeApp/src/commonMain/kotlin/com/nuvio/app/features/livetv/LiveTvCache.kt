@@ -43,6 +43,7 @@ private data class CachedLiveTvProgram(
     val endMillis: Long,
     val description: String? = null,
     val category: String? = null,
+    val flags: Int = 0,
 )
 
 @Serializable
@@ -131,6 +132,7 @@ internal object LiveTvCacheStore {
                         endMillis = program.endMillis,
                         description = program.description,
                         category = program.category,
+                        flags = program.flags,
                     )
                 }
             },
@@ -150,6 +152,7 @@ internal object LiveTvCacheStore {
                             endMillis = program.endMillis,
                             description = program.description,
                             category = program.category,
+                            flags = program.flags,
                         )
                     }
                 },
@@ -163,7 +166,7 @@ internal object LiveTvCacheStore {
  * Bumped when the channel list is read differently, so lists saved by an older version are
  * loaded again (3: VLC's user agent by default, Xtream panel links in the account's format).
  */
-private const val ChannelsCacheFormat = 4 // Total Eclipse: 4 = the TVs' portable channel keys
+private const val ChannelsCacheFormat = 5 // Total Eclipse: 4 = the TVs' portable channel keys; 5 = programme kinds
 
 internal fun liveTvChannelSourceSignature(state: LiveTvUiState): String = buildString {
     append("v").append(ChannelsCacheFormat).append(';')

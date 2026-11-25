@@ -20,6 +20,8 @@ data class LiveTvEpgProgram(
     val endMillis: Long,
     val description: String? = null,
     val category: String? = null,
+    /** Total Eclipse: TotalEclipseProgrammeKind flags (NEW, MOVIE, SPORTS, NEWS, KIDS). */
+    val flags: Int = 0,
 ) {
     fun isAiringAt(timeMillis: Long): Boolean = timeMillis in startMillis until endMillis
 

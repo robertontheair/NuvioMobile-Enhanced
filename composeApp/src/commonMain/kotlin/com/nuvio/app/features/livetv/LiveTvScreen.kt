@@ -158,6 +158,9 @@ fun LiveTvScreen(
     var isSearchVisible by rememberSaveable { mutableStateOf(false) }
     var section by rememberSaveable { mutableStateOf(LiveTvSection.Channels) }
     var filterMode by rememberSaveable { mutableStateOf(LiveTvChannelFilterMode.All) }
+    // Total Eclipse: "Sports On Now" etc. (by what's airing), on top of All.
+    var onNowFilterName by rememberSaveable { mutableStateOf<String?>(null) }
+    val onNowFilter = onNowFilterName?.let { name -> LiveTvOnNowFilter.entries.firstOrNull { it.name == name } }
     var selectedCategoryName by rememberSaveable { mutableStateOf<String?>(null) }
     var guideChannelId by rememberSaveable { mutableStateOf<String?>(null) }
     val epgNowMillis = rememberLiveTvEpgNowMillis()
@@ -204,8 +207,11 @@ fun LiveTvScreen(
         selectedCategoryName,
         searchQuery,
         uncategorizedLabel,
+        onNowFilter,
+        uiState.epgPrograms,
+        guideShownMillis / 60_000L,
     ) {
-        filterLiveTvChannels(
+        val filtered = filterLiveTvChannels(
             channels = uiState.channels,
             favoriteChannelIds = uiState.favoriteChannelIds,
             recentChannelIds = uiState.recentChannelIds,
@@ -214,6 +220,12 @@ fun LiveTvScreen(
             searchQuery = searchQuery,
             uncategorizedGroupName = uncategorizedLabel,
         )
+        if (onNowFilter == null) filtered else liveTvOnNow(filtered, uiState.epgPrograms, onNowFilter, guideShownMillis)
+    }
+    // Total Eclipse: On Now chips that have channels right now (at the time the guide shows).
+    val onNowCounts = remember(uiState.channels, uiState.epgPrograms, guideShownMillis / 60_000L) {
+        LiveTvOnNowFilter.entries.associateWith { liveTvOnNow(uiState.channels, uiState.epgPrograms, it, guideShownMillis).size }
+            .filterValues { it > 0 }
     }
 
     val lastWatchedChannel = remember(uiState.channels, uiState.lastWatchedChannelId) {
@@ -530,22 +542,33 @@ fun LiveTvScreen(
                             showFavorites = hasFavorites,
                             categories = categoryChips,
                             counts = channelChipCounts,
+                            onNowCounts = onNowCounts,
+                            selectedOnNow = onNowFilter,
+                            onOnNowSelected = { filter ->
+                                filterMode = LiveTvChannelFilterMode.All
+                                selectedCategoryName = null
+                                onNowFilterName = filter.name
+                            },
                             onAllSelected = {
                                 filterMode = LiveTvChannelFilterMode.All
                                 selectedCategoryName = null
+                                onNowFilterName = null
                             },
                             onRecentsSelected = {
                                 filterMode = LiveTvChannelFilterMode.Recents
                                 selectedCategoryName = null
+                                onNowFilterName = null
                             },
                             onClearRecents = LiveTvRepository::clearRecentChannels,
                             onFavoritesSelected = {
                                 filterMode = LiveTvChannelFilterMode.Favorites
                                 selectedCategoryName = null
+                                onNowFilterName = null
                             },
                             onGroupSelected = { category ->
                                 filterMode = LiveTvChannelFilterMode.Category
                                 selectedCategoryName = category
+                                onNowFilterName = null
                             },
                         )
                     }
@@ -1035,6 +1058,9 @@ private fun LiveTvChannelControls(
     showFavorites: Boolean,
     categories: List<String>,
     counts: LiveTvChannelChipCounts,
+    onNowCounts: Map<LiveTvOnNowFilter, Int> = emptyMap(),
+    selectedOnNow: LiveTvOnNowFilter? = null,
+    onOnNowSelected: (LiveTvOnNowFilter) -> Unit = {},
     onAllSelected: () -> Unit,
     onRecentsSelected: () -> Unit,
     onClearRecents: () -> Unit,
@@ -1067,7 +1093,7 @@ private fun LiveTvChannelControls(
             ) {
                 LiveTvPanelFilterChip(
                     label = allLabel,
-                    selected = filterMode == LiveTvChannelFilterMode.All,
+                    selected = filterMode == LiveTvChannelFilterMode.All && selectedOnNow == null,
                     onClick = onAllSelected,
                     count = counts.all,
                 )
@@ -1092,6 +1118,14 @@ private fun LiveTvChannelControls(
                         selected = filterMode == LiveTvChannelFilterMode.Favorites,
                         onClick = onFavoritesSelected,
                         count = counts.favorites,
+                    )
+                }
+                onNowCounts.forEach { (filter, count) ->
+                    LiveTvPanelFilterChip(
+                        label = filter.label,
+                        selected = selectedOnNow == filter,
+                        onClick = { onOnNowSelected(filter) },
+                        count = count,
                     )
                 }
                 categories.forEach { category ->
