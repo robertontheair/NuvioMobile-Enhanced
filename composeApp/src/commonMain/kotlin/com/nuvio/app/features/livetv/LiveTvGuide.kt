@@ -61,6 +61,7 @@ internal fun LiveTvGuideTimeRuler(
     scrollState: ScrollState,
     windowStart: Long,
     nowMillis: Long,
+    jumpControl: @Composable () -> Unit = {},
 ) {
     val tokens = MaterialTheme.nuvio
     Row(
@@ -68,7 +69,10 @@ internal fun LiveTvGuideTimeRuler(
             .fillMaxWidth()
             .height(28.dp),
     ) {
-        Box(modifier = Modifier.width(LiveTvGuideChannelColumnWidth))
+        Box(
+            modifier = Modifier.width(LiveTvGuideChannelColumnWidth).fillMaxHeight(),
+            contentAlignment = Alignment.CenterStart,
+        ) { jumpControl() }
         Box(
             modifier = Modifier
                 .weight(1f)

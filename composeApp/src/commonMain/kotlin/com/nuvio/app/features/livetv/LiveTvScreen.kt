@@ -163,7 +163,13 @@ fun LiveTvScreen(
     val epgNowMillis = rememberLiveTvEpgNowMillis()
     val guideScrollState = rememberScrollState()
     val guideDensity = LocalDensity.current
-    val guideWindowStart = remember(epgNowMillis / LIVE_TV_GUIDE_SLOT_MILLIS) { liveTvGuideWindowStart(epgNowMillis) }
+    // Total Eclipse: Jump To moves the guide to [guideJumpMillis]; null is now.
+    var guideJumpMillis by remember { mutableStateOf<Long?>(null) }
+    if (guideJumpMillis != null && guideJumpMillis!! <= epgNowMillis) guideJumpMillis = null
+    val guideShownMillis = guideJumpMillis ?: epgNowMillis
+    val guideWindowStart = remember(epgNowMillis / LIVE_TV_GUIDE_SLOT_MILLIS, guideJumpMillis) {
+        liveTvGuideWindowStart(guideJumpMillis ?: epgNowMillis)
+    }
     var sportsFilter by rememberSaveable { mutableStateOf(LIVE_TV_SPORTS_FILTER_ALL) }
     var vodKind by rememberSaveable { mutableStateOf(LiveTvVodKind.Movies) }
     var vodCategoryId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -291,12 +297,15 @@ fun LiveTvScreen(
             .filter { liveTvGuideHasPrograms(uiState.epgPrograms[it.id], guideWindowStart) }
             .sortedByDescending { it.id in uiState.favoriteChannelIds }
     }
+    val guideEndMillis = remember(uiState.epgPrograms) {
+        uiState.epgPrograms.values.maxOfOrNull { programs -> programs.maxOfOrNull { it.endMillis } ?: 0L } ?: 0L
+    }
     LaunchedEffect(section, guideWindowStart, guideChannels.isNotEmpty()) {
         if (section != LiveTvSection.Guide || guideChannels.isEmpty()) return@LaunchedEffect
         withTimeoutOrNull(3_000L) {
             snapshotFlow { guideScrollState.maxValue }.first { it in 1 until Int.MAX_VALUE }
         }
-        val minutesBeforeNow = ((epgNowMillis - guideWindowStart) / 60_000L - 15L).coerceAtLeast(0L)
+        val minutesBeforeNow = ((guideShownMillis - guideWindowStart) / 60_000L - 15L).coerceAtLeast(0L)
         val target = with(guideDensity) { (LiveTvGuideDpPerMinute * minutesBeforeNow.toFloat()).roundToPx() }
         guideScrollState.scrollTo(target)
     }
@@ -541,6 +550,14 @@ fun LiveTvScreen(
                             scrollState = guideScrollState,
                             windowStart = guideWindowStart,
                             nowMillis = epgNowMillis,
+                            jumpControl = {
+                                LiveTvGuideJumpButton(
+                                    nowMillis = epgNowMillis,
+                                    shownMillis = guideShownMillis,
+                                    guideEndMillis = guideEndMillis,
+                                    onJump = { guideJumpMillis = it },
+                                )
+                            },
                         )
                     }
                     if (section == LiveTvSection.Sports && sportsState.events.isNotEmpty()) {
