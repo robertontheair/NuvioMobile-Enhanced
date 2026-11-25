@@ -1581,7 +1581,7 @@ private fun LiveTvChannelCard(
                 }
             }
             if (onRemove != null) {
-                IconButton(onClick = onRemove) {
+                IconButton(onClick = onRemove, modifier = Modifier.size(32.dp)) {
                     Icon(
                         imageVector = Icons.Rounded.Close,
                         contentDescription = "Remove from Recently Watched",
@@ -1589,7 +1589,7 @@ private fun LiveTvChannelCard(
                     )
                 }
             }
-            IconButton(onClick = onFavoriteClick) {
+            IconButton(onClick = onFavoriteClick, modifier = if (onRemove != null) Modifier.size(32.dp) else Modifier) {
                 Icon(
                     imageVector = if (isFavorite) Icons.Rounded.Star else Icons.Rounded.StarBorder,
                     contentDescription = null,

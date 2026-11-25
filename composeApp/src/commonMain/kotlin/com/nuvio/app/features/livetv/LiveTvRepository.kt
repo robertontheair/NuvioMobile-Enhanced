@@ -756,7 +756,7 @@ object LiveTvRepository {
     }
 }
 
-private const val LIVE_TV_MAX_RECENT_CHANNELS = 30
+private const val LIVE_TV_MAX_RECENT_CHANNELS = 20 // Total Eclipse: as on the Apple TVs
 
 private const val LIVE_TV_EPG_CACHE_TTL_MILLIS = 24L * 60L * 60L * 1000L
 
