@@ -159,7 +159,6 @@ fun HomeScreen(
     } else {
         com.nuvio.app.totaleclipse.TotalEclipseBrowse.rememberHomeUiState(browse, repositoryHomeUiState)
     }
-    HomeHeroMetaLoadEffect(homeUiState.heroItems)
     val homeSettingsUiState by remember {
         HomeCatalogSettingsRepository.snapshot()
         HomeCatalogSettingsRepository.uiState
@@ -592,6 +591,12 @@ fun HomeScreen(
         )
     }
     val hasContinueWatchingRows = continueWatchingItems.isNotEmpty() || upcomingItems.isNotEmpty()
+    // Total Eclipse: Movies/Shows hero = Continue Watching of this type, then the first row.
+    val pageHeroItems = remember(homeUiState.heroItems, continueWatchingItems, browse) {
+        if (browse == null) homeUiState.heroItems
+        else com.nuvio.app.totaleclipse.TotalEclipseBrowse.pageHero(continueWatchingItems, homeUiState.heroItems)
+    }
+    HomeHeroMetaLoadEffect(pageHeroItems)
 
     ScreenActivityEffect(activeProfileId, continueWatchingItems.isNotEmpty(), hasUserScrolledContinueWatching) { active ->
         if (!active) return@ScreenActivityEffect
@@ -973,12 +978,12 @@ fun HomeScreen(
     val hasRenderableHomeRows = homeUiState.sections.isNotEmpty() || hasRenderableCollectionRows
     val showHeroSlot = shouldShowHomeHeroSlot(
         heroEnabled = homeSettingsUiState.heroEnabled,
-        hasHeroItems = homeUiState.heroItems.isNotEmpty(),
+        hasHeroItems = pageHeroItems.isNotEmpty(),
         isResolvingHeroSources = isResolvingHeroSources,
         hasRenderableHomeRows = hasRenderableHomeRows,
     )
     val showHeroSkeleton = showHeroSlot &&
-        homeUiState.heroItems.isEmpty() &&
+        pageHeroItems.isEmpty() &&
         isResolvingHeroSources
     val isInitialHomeContentLoading = shouldShowInitialHomeLoading(
         hasRenderableHomeRows = hasRenderableHomeRows,
@@ -1042,7 +1047,7 @@ fun HomeScreen(
             ) {
                 if (showHeroSlot) {
                     item(key = "home_hero", contentType = "hero") {
-                        val homeHeroState = rememberHomeHeroState(homeUiState.heroItems)
+                        val homeHeroState = rememberHomeHeroState(pageHeroItems)
                         Crossfade(
                             targetState = showHeroSkeleton,
                             modifier = Modifier.nuvioHorizontalScrollBleed(LocalVerticalBarPadding.current),
@@ -1057,7 +1062,7 @@ fun HomeScreen(
                                     heroStyle = homeSettingsUiState.heroStyle,
                                 )
 
-                                homeUiState.heroItems.isNotEmpty() -> HomeHeroSection(
+                                pageHeroItems.isNotEmpty() -> HomeHeroSection(
                                     items = homeHeroState.items,
                                     modifier = Modifier,
                                     viewportHeight = maxHeight,
@@ -1162,7 +1167,7 @@ fun HomeScreen(
                         }
                     }
 
-                    homeUiState.sections.isEmpty() && homeUiState.heroItems.isEmpty() &&
+                    homeUiState.sections.isEmpty() && pageHeroItems.isEmpty() &&
                         (!continueWatchingPreferences.isVisible || !hasContinueWatchingRows) &&
                         !hasRenderableCollectionRows -> {
                         item {

@@ -12,6 +12,7 @@ import com.nuvio.app.features.collection.FolderDetailUiState
 import com.nuvio.app.features.home.HomeCatalogSection
 import com.nuvio.app.features.home.HomeCatalogSettingsItem
 import com.nuvio.app.features.home.HomeUiState
+import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.watchprogress.ContinueWatchingItem
 
 /**
@@ -69,11 +70,13 @@ internal object TotalEclipseBrowse {
                 pinned = pinned.map(::withoutViewAll),
                 personal = personalRows.map(::withoutViewAll),
             )
-            // As on the TVs (CollectionHomeModel: hero = the first row's titles): the hero is the
-            // first Browse catalog (e.g. Trending), not Home's hero picks.
-            val firstCatalog = tvTitles(store.getCatalogSectionsForRows(), folderState)
-                .let { arrangeLikeTheTVs(it) }.firstOrNull()
-            val hero = firstCatalog?.items?.take(10).orEmpty()
+            // As on the TVs: after Continue Watching (added by HomeScreen, see pageHero), the
+            // folder's own first row (e.g. Trending), and only once that row has loaded: rows
+            // still loading are left out of the list, so "the first row" was whichever came first.
+            val firstTabKey = folderState.folder?.let { folder ->
+                folderState.tabs.firstOrNull { !it.isAllTab }?.let { "folder_${folder.id}_${it.label}" }
+            }
+            val hero = store.getCatalogSectionsForRows().firstOrNull { it.key == firstTabKey }?.items?.take(10).orEmpty()
             HomeUiState(
                 isLoading = target != null && folderState.isLoading && sections.isEmpty(),
                 heroItems = hero,
@@ -146,6 +149,22 @@ internal object TotalEclipseBrowse {
                 order = index,
             )
         }
+
+    /**
+     * The Movies/Shows hero as on the TVs (HomeTV hometvPageHero, Rob 2026-11-18): your Continue
+     * Watching titles of this type first, then the folder's first row.
+     */
+    fun pageHero(continueWatching: List<ContinueWatchingItem>, firstRow: List<MetaPreview>): List<MetaPreview> =
+        (continueWatching.map { item ->
+            MetaPreview(
+                id = item.parentMetaId,
+                type = item.parentMetaType,
+                name = item.title,
+                poster = item.poster,
+                banner = item.background ?: item.imageUrl,
+                logo = item.logo,
+            )
+        } + firstRow).distinctBy { "${it.type}:${it.id}" }.take(10)
 
     fun continueWatching(kind: TotalEclipseBrowseKind, items: List<ContinueWatchingItem>): List<ContinueWatchingItem> =
         items.filter { kind.includesType(it.parentMetaType) }
