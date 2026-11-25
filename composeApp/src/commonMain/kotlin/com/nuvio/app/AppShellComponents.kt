@@ -30,7 +30,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.SmartDisplay
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.Icon
@@ -342,54 +343,30 @@ internal fun TabletFloatingTopBar(
                 horizontalArrangement = Arrangement.spacedBy(tokens.spacing.controlGap),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                // Total Eclipse: the TVs' tabs and order; Search is the button on Movies and Shows.
                 TabletTopPillItem(
-                    label = stringResource(Res.string.compose_nav_home),
-                    selected = selectedTab == AppScreenTab.Home,
-                    onClick = { onTabSelected(AppScreenTab.Home) },
+                    label = "Movies",
+                    selected = selectedTab == AppScreenTab.Movies,
+                    onClick = { onTabSelected(AppScreenTab.Movies) },
                     icon = {
                         Icon(
-                            imageVector = Icons.Filled.Home,
-                            contentDescription = stringResource(Res.string.compose_nav_home),
+                            imageVector = Icons.Filled.Movie,
+                            contentDescription = "Movies",
                             modifier = Modifier.size(NuvioTokens.Space.s18),
-                            tint = if (selectedTab == AppScreenTab.Home) {
-                                tokens.colors.textPrimary
-                            } else {
-                                tokens.colors.textMuted
-                            },
+                            tint = if (selectedTab == AppScreenTab.Movies) tokens.colors.textPrimary else tokens.colors.textMuted,
                         )
                     },
                 )
                 TabletTopPillItem(
-                    label = stringResource(Res.string.compose_nav_search),
-                    selected = selectedTab == AppScreenTab.Search,
-                    onClick = { onTabSelected(AppScreenTab.Search) },
+                    label = "Shows",
+                    selected = selectedTab == AppScreenTab.Shows,
+                    onClick = { onTabSelected(AppScreenTab.Shows) },
                     icon = {
                         Icon(
-                            painter = painterResource(Res.drawable.sidebar_search),
-                            contentDescription = stringResource(Res.string.compose_nav_search),
+                            imageVector = Icons.Filled.SmartDisplay,
+                            contentDescription = "Shows",
                             modifier = Modifier.size(NuvioTokens.Space.s18),
-                            tint = if (selectedTab == AppScreenTab.Search) {
-                                tokens.colors.textPrimary
-                            } else {
-                                tokens.colors.textMuted
-                            },
-                        )
-                    },
-                )
-                TabletTopPillItem(
-                    label = stringResource(Res.string.compose_nav_library),
-                    selected = selectedTab == AppScreenTab.Library,
-                    onClick = { onTabSelected(AppScreenTab.Library) },
-                    icon = {
-                        Icon(
-                            painter = painterResource(Res.drawable.sidebar_library),
-                            contentDescription = stringResource(Res.string.compose_nav_library),
-                            modifier = Modifier.size(NuvioTokens.Space.s18),
-                            tint = if (selectedTab == AppScreenTab.Library) {
-                                tokens.colors.textPrimary
-                            } else {
-                                tokens.colors.textMuted
-                            },
+                            tint = if (selectedTab == AppScreenTab.Shows) tokens.colors.textPrimary else tokens.colors.textMuted,
                         )
                     },
                 )
@@ -412,6 +389,23 @@ internal fun TabletFloatingTopBar(
                         },
                     )
                 }
+                TabletTopPillItem(
+                    label = stringResource(Res.string.compose_nav_library),
+                    selected = selectedTab == AppScreenTab.Library,
+                    onClick = { onTabSelected(AppScreenTab.Library) },
+                    icon = {
+                        Icon(
+                            painter = painterResource(Res.drawable.sidebar_library),
+                            contentDescription = stringResource(Res.string.compose_nav_library),
+                            modifier = Modifier.size(NuvioTokens.Space.s18),
+                            tint = if (selectedTab == AppScreenTab.Library) {
+                                tokens.colors.textPrimary
+                            } else {
+                                tokens.colors.textMuted
+                            },
+                        )
+                    },
+                )
                 Surface(
                     color = if (selectedTab == AppScreenTab.Settings) {
                         tokens.colors.overlaySelected

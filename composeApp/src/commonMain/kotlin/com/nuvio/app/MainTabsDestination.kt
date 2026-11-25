@@ -11,7 +11,8 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.SmartDisplay
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
@@ -254,28 +255,21 @@ internal fun mainFloatingNavigationItems(
     backdrop: Backdrop?,
     defaultIconColorOverride: Color? = null,
 ): List<FloatingNavigationItem> = buildList {
+    // Total Eclipse: the TVs' tabs and order; Search is the button on Movies and Shows.
     add(
         FloatingNavigationItem(
-            selected = highlightedTab == AppScreenTab.Home,
-            onClick = { onTabSelected(AppScreenTab.Home) },
-            icon = Icons.Filled.Home,
-            label = stringResource(Res.string.compose_nav_home),
+            selected = highlightedTab == AppScreenTab.Movies,
+            onClick = { onTabSelected(AppScreenTab.Movies) },
+            icon = Icons.Filled.Movie,
+            label = "Movies",
         ),
     )
     add(
         FloatingNavigationItem(
-            selected = highlightedTab == AppScreenTab.Search,
-            onClick = { onTabSelected(AppScreenTab.Search) },
-            drawable = Res.drawable.sidebar_search,
-            label = stringResource(Res.string.compose_nav_search),
-        ),
-    )
-    add(
-        FloatingNavigationItem(
-            selected = highlightedTab == AppScreenTab.Library,
-            onClick = { onTabSelected(AppScreenTab.Library) },
-            drawable = Res.drawable.sidebar_library,
-            label = stringResource(Res.string.compose_nav_library),
+            selected = highlightedTab == AppScreenTab.Shows,
+            onClick = { onTabSelected(AppScreenTab.Shows) },
+            icon = Icons.Filled.SmartDisplay,
+            label = "Shows",
         ),
     )
     if (showLiveTv) {
@@ -288,6 +282,14 @@ internal fun mainFloatingNavigationItems(
             ),
         )
     }
+    add(
+        FloatingNavigationItem(
+            selected = highlightedTab == AppScreenTab.Library,
+            onClick = { onTabSelected(AppScreenTab.Library) },
+            drawable = Res.drawable.sidebar_library,
+            label = stringResource(Res.string.compose_nav_library),
+        ),
+    )
     add(
         FloatingNavigationItem(
             selected = highlightedTab == AppScreenTab.Settings,
@@ -319,22 +321,16 @@ internal fun MainClassicNavigationBar(
 ) {
     NuvioClassicNavigationBar(modifier) {
         NavItem(
-            selected = highlightedTab == AppScreenTab.Home,
-            onClick = { onTabSelected(AppScreenTab.Home) },
-            icon = Icons.Filled.Home,
-            contentDescription = stringResource(Res.string.compose_nav_home),
+            selected = highlightedTab == AppScreenTab.Movies,
+            onClick = { onTabSelected(AppScreenTab.Movies) },
+            icon = Icons.Filled.Movie,
+            contentDescription = "Movies",
         )
         NavItem(
-            selected = highlightedTab == AppScreenTab.Search,
-            onClick = { onTabSelected(AppScreenTab.Search) },
-            icon = Res.drawable.sidebar_search,
-            contentDescription = stringResource(Res.string.compose_nav_search),
-        )
-        NavItem(
-            selected = highlightedTab == AppScreenTab.Library,
-            onClick = { onTabSelected(AppScreenTab.Library) },
-            icon = Res.drawable.sidebar_library,
-            contentDescription = stringResource(Res.string.compose_nav_library),
+            selected = highlightedTab == AppScreenTab.Shows,
+            onClick = { onTabSelected(AppScreenTab.Shows) },
+            icon = Icons.Filled.SmartDisplay,
+            contentDescription = "Shows",
         )
         if (showLiveTv) {
             NavItem(
@@ -344,6 +340,12 @@ internal fun MainClassicNavigationBar(
                 contentDescription = stringResource(Res.string.compose_nav_live_tv),
             )
         }
+        NavItem(
+            selected = highlightedTab == AppScreenTab.Library,
+            onClick = { onTabSelected(AppScreenTab.Library) },
+            icon = Res.drawable.sidebar_library,
+            contentDescription = stringResource(Res.string.compose_nav_library),
+        )
         NavItem(
             selected = highlightedTab == AppScreenTab.Settings,
             onClick = { onTabSelected(AppScreenTab.Settings) },

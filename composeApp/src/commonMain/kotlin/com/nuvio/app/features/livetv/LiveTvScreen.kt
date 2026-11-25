@@ -221,7 +221,12 @@ fun LiveTvScreen(
             searchQuery = searchQuery,
             uncategorizedGroupName = uncategorizedLabel,
         )
-        if (onNowFilter == null) filtered
+        if (onNowFilter == null) {
+            // Total Eclipse: event slots after the real channels in All Channels.
+            if (filterMode != LiveTvChannelFilterMode.All || searchQuery.isNotBlank()) filtered
+            else filtered.partition { it.group != com.nuvio.app.totaleclipse.TotalEclipseLiveGroups.LIVE_EVENTS }
+                .let { (channels, events) -> channels + events }
+        }
         else liveTvOnNow(filtered, uiState.epgPrograms, onNowFilter, guideShownMillis, uiState.favoriteChannelIds + uiState.recentChannelIds)
     }
     // Total Eclipse: On Now chips that have channels right now (at the time the guide shows).
@@ -253,12 +258,31 @@ fun LiveTvScreen(
             .mapNotNull { it.categoryName }
     }
 
+    // Total Eclipse: Live TV opens on Recently Watched, as on the Apple TVs; without any, on
+    // Favorites, then the first category. Once per profile; after that it's your choice.
+    val liveProfile = com.nuvio.app.features.profiles.ProfileRepository.state.collectAsStateWithLifecycle().value.activeProfile?.profileIndex ?: 0
+    var openedForProfile by rememberSaveable { mutableStateOf(-1) }
+    LaunchedEffect(liveProfile, uiState.channels.isNotEmpty(), hasRecents, hasFavorites, categoryChips) {
+        if (openedForProfile == liveProfile || uiState.channels.isEmpty()) return@LaunchedEffect
+        openedForProfile = liveProfile
+        onNowFilterName = null
+        when {
+            hasRecents -> filterMode = LiveTvChannelFilterMode.Recents
+            hasFavorites -> filterMode = LiveTvChannelFilterMode.Favorites
+            categoryChips.isNotEmpty() -> {
+                selectedCategoryName = categoryChips.first()
+                filterMode = LiveTvChannelFilterMode.Category
+            }
+            else -> filterMode = LiveTvChannelFilterMode.All
+        }
+    }
+
     LaunchedEffect(hasRecents, hasFavorites, filterMode) {
         if ((filterMode == LiveTvChannelFilterMode.Recents && !hasRecents) ||
             (filterMode == LiveTvChannelFilterMode.Favorites && !hasFavorites)
         ) {
-            filterMode = LiveTvChannelFilterMode.All
-            selectedCategoryName = null
+            selectedCategoryName = categoryChips.firstOrNull()
+            filterMode = if (selectedCategoryName != null) LiveTvChannelFilterMode.Category else LiveTvChannelFilterMode.All
         }
     }
 
@@ -1101,12 +1125,6 @@ private fun LiveTvChannelControls(
                 horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                LiveTvPanelFilterChip(
-                    label = allLabel,
-                    selected = filterMode == LiveTvChannelFilterMode.All && selectedOnNow == null,
-                    onClick = onAllSelected,
-                    count = counts.all,
-                )
                 if (showRecents) {
                     LiveTvPanelFilterChip(
                         label = stringResource(Res.string.live_tv_filter_recents),
@@ -1147,6 +1165,13 @@ private fun LiveTvChannelControls(
                         count = counts.categories[category.lowercase()] ?: 0,
                     )
                 }
+                // Total Eclipse: All Channels is last (Rob, 2026-11-24).
+                LiveTvPanelFilterChip(
+                    label = allLabel,
+                    selected = filterMode == LiveTvChannelFilterMode.All && selectedOnNow == null,
+                    onClick = onAllSelected,
+                    count = counts.all,
+                )
             }
         }
     }
