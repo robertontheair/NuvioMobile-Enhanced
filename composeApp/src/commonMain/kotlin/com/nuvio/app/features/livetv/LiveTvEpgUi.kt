@@ -58,6 +58,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlinx.datetime.plus
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.live_tv_button_play
 import nuvio.composeapp.generated.resources.live_tv_epg_guide_title
@@ -354,7 +355,7 @@ private fun LiveTvEpgProgramRow(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .then(if (hasDescription) Modifier.clickable { expanded = !expanded } else Modifier)
+                .clickable { expanded = !expanded }
                 .padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
@@ -461,6 +462,89 @@ private fun LiveTvEpgProgramRow(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
+            // Total Eclipse: Find Other Airings, as on the Apple TVs: the same show on other
+            // channels or later times (tap the programme to see them), each with its own reminder.
+            if (expanded) {
+                val others = remember(program.title, program.startMillis, channelId) {
+                    totalEclipseOtherAirings(program, channelId, nowMillis)
+                }
+                if (others.isNotEmpty()) {
+                    Text(
+                        text = "Other airings",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = tokens.colors.textMuted,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                    others.forEach { (channel, airing) ->
+                        val airingReminded = TotalEclipseReminders.id(channel.id, airing.startMillis) in reminders
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable(enabled = airing.startMillis > nowMillis) {
+                                    reminderScope.launch {
+                                        TotalEclipseReminders.toggle(channel.id, channel.name, airing.displayTitle, airing.startMillis)
+                                    }
+                                }
+                                .padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = "${totalEclipseAiringDay(airing.startMillis, nowMillis)} ${formatLiveTvEpgTime(airing.startMillis)} · ${channel.name}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = tokens.colors.textSecondary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f),
+                            )
+                            if (airing.startMillis > nowMillis) {
+                                Icon(
+                                    imageVector = if (airingReminded) Icons.Rounded.Notifications else Icons.Rounded.NotificationsNone,
+                                    contentDescription = if (airingReminded) "Cancel reminder" else "Remind me",
+                                    tint = if (airingReminded) tokens.colors.accent else tokens.colors.textMuted,
+                                    modifier = Modifier.size(16.dp),
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         }
+    }
+}
+
+/** Total Eclipse: the same programme title elsewhere in the guide, from now on (at most eight). */
+internal fun totalEclipseOtherAirings(
+    program: LiveTvEpgProgram,
+    channelId: String,
+    nowMillis: Long,
+): List<Pair<LiveTvChannel, LiveTvEpgProgram>> {
+    val state = LiveTvRepository.uiState.value
+    val wanted = program.displayTitle.lowercase().filter { it.isLetterOrDigit() }
+    if (wanted.isEmpty()) return emptyList()
+    val channels = state.channels.associateBy { it.id }
+    return state.epgPrograms.asSequence()
+        .flatMap { (id, list) -> list.asSequence().map { id to it } }
+        .filter { (id, p) ->
+            p.endMillis > nowMillis && !(id == channelId && p.startMillis == program.startMillis) &&
+                p.displayTitle.lowercase().filter { it.isLetterOrDigit() } == wanted
+        }
+        .mapNotNull { (id, p) -> channels[id]?.let { it to p } }
+        .sortedBy { it.second.startMillis }
+        .take(8)
+        .toList()
+}
+
+/** "Today", "Tomorrow" or the weekday ("Thu"). */
+private fun totalEclipseAiringDay(startMillis: Long, nowMillis: Long): String {
+    val zone = kotlinx.datetime.TimeZone.currentSystemDefault()
+    val day = kotlin.time.Instant.fromEpochMilliseconds(startMillis).toLocalDateTime(zone).date
+    val today = kotlin.time.Instant.fromEpochMilliseconds(nowMillis).toLocalDateTime(zone).date
+    return when (day) {
+        today -> "Today"
+        today.plus(1, kotlinx.datetime.DateTimeUnit.DAY) -> "Tomorrow"
+        else -> day.dayOfWeek.name.take(3).lowercase().replaceFirstChar { it.uppercase() }
     }
 }

@@ -21,6 +21,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Tv
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
+import androidx.compose.material.icons.rounded.Notifications
+import com.nuvio.app.totaleclipse.TotalEclipseReminders
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -210,6 +214,8 @@ private fun LiveTvGuideRow(
                     .width(LiveTvGuideTimelineWidth)
                     .fillMaxHeight(),
             ) {
+                // Total Eclipse: a bell on programmes with a reminder, as on the Apple TVs.
+                val reminders by TotalEclipseReminders.scheduled.collectAsState()
                 programs.forEach { program ->
                     val start = maxOf(program.startMillis, windowStart)
                     val end = minOf(program.endMillis, windowEnd)
@@ -245,6 +251,14 @@ private fun LiveTvGuideRow(
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
+                            if (TotalEclipseReminders.id(channel.id, program.startMillis) in reminders) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Notifications,
+                                    contentDescription = "Reminder set",
+                                    tint = tokens.colors.accent,
+                                    modifier = Modifier.size(12.dp),
+                                )
+                            }
                             program.guideTags.take(2).forEach { LiveTvGuideTagPill(it) }
                             Text(
                                 text = liveTvEpgTimeRange(program),

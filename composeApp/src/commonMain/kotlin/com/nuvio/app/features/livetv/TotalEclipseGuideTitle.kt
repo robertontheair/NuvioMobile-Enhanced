@@ -64,7 +64,16 @@ internal object TotalEclipseGuideTitle {
 internal val LiveTvEpgProgram.displayTitle: String get() = TotalEclipseGuideTitle.parse(title).first
 
 /** LIVE, NEW, … from the provider's markers. */
-internal val LiveTvEpgProgram.guideTags: List<String> get() = TotalEclipseGuideTitle.parse(title).second
+internal val LiveTvEpgProgram.guideTags: List<String> get() {
+    val tags = TotalEclipseGuideTitle.parse(title).second
+    // Total Eclipse: as on the Apple TVs, the guide's own premiere and movie flags give the NEW
+    // and MOVIE pills too, not only the provider's markers in the title.
+    val fromFlags = buildList {
+        if (flags and TotalEclipseProgrammeKind.NEW != 0 && "NEW" !in tags) add("NEW")
+        if (flags and TotalEclipseProgrammeKind.MOVIE != 0 && "MOVIE" !in tags) add("MOVIE")
+    }
+    return if (fromFlags.isEmpty()) tags else tags + fromFlags
+}
 
 @Composable
 internal fun LiveTvGuideTagPill(tag: String, modifier: Modifier = Modifier) {
