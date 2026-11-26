@@ -79,6 +79,7 @@ internal fun BoxScope.PlayerPlaybackOverlays(
     onDismissError: () -> Unit,
     errorTitle: String? = null,
     onOtherSourcesError: (() -> Unit)? = null,
+    moreErrorActions: List<Pair<String, () -> Unit>> = emptyList(),
 ) {
     var skipHeightPx by remember { mutableIntStateOf(0) }
     val density = LocalDensity.current
@@ -201,6 +202,7 @@ internal fun BoxScope.PlayerPlaybackOverlays(
             onDismiss = onDismissError,
             title = errorTitle,
             onOtherSources = onOtherSourcesError,
+            moreActions = moreErrorActions,
         )
     }
 }

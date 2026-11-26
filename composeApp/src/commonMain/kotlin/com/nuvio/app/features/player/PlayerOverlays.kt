@@ -297,6 +297,7 @@ internal fun ErrorModal(
     onRetry: (() -> Unit)? = null,
     title: String? = null,
     onOtherSources: (() -> Unit)? = null,
+    moreActions: List<Pair<String, () -> Unit>> = emptyList(),
 ) {
     Box(
         modifier = Modifier
@@ -358,6 +359,27 @@ internal fun ErrorModal(
                 ) {
                     Text(
                         text = "Try Again",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 12.dp),
+                        style = MaterialTheme.nuvioTypeScale.bodyLg.copy(fontWeight = FontWeight.Bold),
+                        color = Color.White,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            }
+            // Total Eclipse: a dead channel also offers Next Channel and Guide, as on the Apple TVs.
+            moreActions.forEach { (label, action) ->
+                Surface(
+                    modifier = Modifier
+                        .padding(top = 4.dp)
+                        .widthIn(min = 180.dp, max = 260.dp)
+                        .clickable(onClick = action),
+                    color = Color.White.copy(alpha = 0.16f),
+                    shape = RoundedCornerShape(12.dp),
+                ) {
+                    Text(
+                        text = label,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 12.dp),

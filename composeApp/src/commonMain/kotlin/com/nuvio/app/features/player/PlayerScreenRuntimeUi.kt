@@ -877,6 +877,7 @@ private fun BoxScope.RenderPlaybackOverlays(
                 activeStreamTitle.ifBlank { title }, raw, activeSourceUrl, activeSourceHeaders,
             )
         }
+        val liveZap = com.nuvio.app.totaleclipse.LocalTotalEclipseLiveZap.current
         // Total Eclipse: films and episodes get the Apple TVs' plain wording and Other Sources.
         val networkUiState by com.nuvio.app.core.network.NetworkStatusRepository.uiState.collectAsStateWithLifecycle()
         val plainError = errorMessage?.takeIf { !isLiveTvPlayback }?.let { raw ->
@@ -998,6 +999,14 @@ private fun BoxScope.RenderPlaybackOverlays(
                     openSourcesPanel()
                 }
             } else null,
+            moreErrorActions = if (isLiveTvPlayback) {
+                buildList {
+                    val zap = liveZap
+                    val next = com.nuvio.app.totaleclipse.TotalEclipseLiveZap.next()
+                    if (zap != null && next != null) add("Next Channel" to { errorMessage = null; zap(next) })
+                    add("Guide" to { errorMessage = null; showLiveChannelsPanel = true })
+                }
+            } else emptyList(),
             onRetryError = if (isLiveTvPlayback) {
                 {
                     errorMessage = null

@@ -87,6 +87,8 @@ internal object TotalEclipseProgrammeKind {
 
 /** Total Eclipse: the guide's "On Now" filters, as on the Apple TVs. */
 internal enum class LiveTvOnNowFilter(val label: String, val flag: Int) {
+    /** Total Eclipse: event slots with a game on now, then starting within 2 h (HomeTV sportsNow). */
+    LiveSportsNow("Live Sports Now", 0),
     Sports("Sports On Now", TotalEclipseProgrammeKind.SPORTS),
     Movies("Movies On Now", TotalEclipseProgrammeKind.MOVIE),
     News("News On Now", TotalEclipseProgrammeKind.NEWS),
@@ -107,6 +109,7 @@ internal fun liveTvOnNow(
     atMillis: Long,
     watched: Set<String> = emptySet(),
 ): List<LiveTvChannel> {
+    if (filter == LiveTvOnNowFilter.LiveSportsNow) return liveSportsNow(channels, programs, atMillis)
     val keys = com.nuvio.app.totaleclipse.TotalEclipseLiveLayout.categoryKeyByChannel
     val first = mutableListOf<LiveTvChannel>()
     val later = mutableListOf<LiveTvChannel>()
@@ -125,4 +128,36 @@ internal fun liveTvOnNow(
     }
     val byName = compareBy(String.CASE_INSENSITIVE_ORDER) { channel: LiveTvChannel -> channel.name }
     return first.sortedWith(byName) + later.sortedWith(byName)
+}
+
+/**
+ * Total Eclipse: as on the Apple TVs (HomeTV HomeTVLiveGroups.sportsNow): the event slots with a
+ * game on at [atMillis] (earliest start first), then the ones starting within two hours (soonest
+ * first). epgfix's guide for a slot reads "Coming up: <game>" until it starts, the game, then
+ * "Event ended"; an empty slot is "No event scheduled". The same game in two slots shows once.
+ */
+internal fun liveSportsNow(
+    channels: List<LiveTvChannel>,
+    programs: Map<String, List<LiveTvEpgProgram>>,
+    atMillis: Long,
+    comingUpMillis: Long = 2L * 60 * 60 * 1000,
+): List<LiveTvChannel> {
+    val keys = com.nuvio.app.totaleclipse.TotalEclipseLiveLayout.categoryKeyByChannel
+    val eventKey = com.nuvio.app.totaleclipse.TotalEclipseLiveGroups.tvKey(com.nuvio.app.totaleclipse.TotalEclipseLiveGroups.LIVE_EVENTS)
+    val live = mutableListOf<Triple<LiveTvChannel, Long, String>>()
+    val soon = mutableListOf<Triple<LiveTvChannel, Long, String>>()
+    for (channel in channels) {
+        val isEvent = keys[channel.id]?.let { it == eventKey } ?: (channel.group == com.nuvio.app.totaleclipse.TotalEclipseLiveGroups.LIVE_EVENTS)
+        if (!isEvent) continue
+        val now = programs[channel.id]?.firstOrNull { it.isAiringAt(atMillis) } ?: continue
+        val title = now.title.trim()
+        when {
+            title.startsWith("Coming up") -> if (now.endMillis <= atMillis + comingUpMillis) soon += Triple(channel, now.endMillis, title)
+            title != "No event scheduled" && title != "Event ended" -> live += Triple(channel, now.startMillis, title)
+        }
+    }
+    val seen = HashSet<String>()
+    return (live.sortedBy { it.second } + soon.sortedBy { it.second })
+        .filter { seen.add(it.third.lowercase()) }
+        .map { it.first }
 }

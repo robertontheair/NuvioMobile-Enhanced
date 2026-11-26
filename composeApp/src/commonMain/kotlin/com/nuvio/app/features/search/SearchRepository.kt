@@ -638,8 +638,10 @@ private data class IndexedSearchResult(
     val error: Throwable? = null,
 )
 
+// Total Eclipse: as on the Apple TVs, one Movies row and one Series row with the add-ons' results
+// merged and de-duplicated, instead of one row per add-on catalog.
 private fun Array<IndexedSearchResult?>.orderedSections(): List<HomeCatalogSection> =
-    mapNotNull { result -> result?.section }
+    com.nuvio.app.totaleclipse.TotalEclipseSearchMerge.merge(mapNotNull { result -> result?.section })
 
 private fun CatalogPage.withUnreleasedFilter(): CatalogPage {
     if (!HomeCatalogSettingsRepository.snapshot().hideUnreleasedContent) return this
