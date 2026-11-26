@@ -5,6 +5,7 @@
 #
 #   scripts/testflight-local.sh            # build and upload
 #   scripts/testflight-local.sh --no-upload   # build and export an .ipa to build/testflight/ only
+#   scripts/testflight-local.sh --device      # Release build signed for this Mac's devices (for measuring)
 #
 # Steps: unsigned Release archive → ad-hoc sign the app with its entitlements (so the shared
 # iCloud store survives; Xcode won't ad-hoc sign a target with iCloud itself) → exportArchive with
@@ -17,7 +18,9 @@ set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd -P)"
 cd "$root"
 upload=true
+method=app-store-connect
 [[ "${1:-}" == "--no-upload" ]] && upload=false
+if [[ "${1:-}" == "--device" ]]; then upload=false; method=debugging; fi
 
 export JAVA_HOME="${JAVA_HOME:-$(mise where java 2>/dev/null || true)}"
 export NUVIO_IOS_DISTRIBUTION=full
@@ -79,7 +82,7 @@ cat > "$out/ExportOptions.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-  <key>method</key><string>app-store-connect</string>
+  <key>method</key><string>${method}</string>
   <key>destination</key><string>${destination}</string>
   <key>signingStyle</key><string>automatic</string>
   <key>teamID</key><string>B2Z256T95E</string>
