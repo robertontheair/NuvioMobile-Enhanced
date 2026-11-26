@@ -175,3 +175,25 @@ internal fun totalEclipseLiveSearchHasMatches(query: String): Boolean {
 
 private fun normalize(text: String): String =
     text.lowercase().filter { it.isLetterOrDigit() }
+
+/** Total Eclipse: the Live tab's search, by the same rules as Global Search. */
+internal object TotalEclipseLiveTabSearch {
+    fun needle(query: String): String = normalize(query.trim())
+
+    /** 0 = the channel's name, category or playlist matches; 1 = a show on now or in the next 24 h; null = no match. */
+    fun matchRank(
+        channel: LiveTvChannel,
+        category: String,
+        programs: List<com.nuvio.app.features.livetv.LiveTvEpgProgram>?,
+        needle: String,
+        nowMillis: Long,
+    ): Int? {
+        if (needle.isEmpty()) return 0
+        if (normalize(channel.name).contains(needle) || normalize(category).contains(needle) ||
+            normalize(channel.playlistName.orEmpty()).contains(needle)
+        ) return 0
+        if (needle.length < 2) return null
+        val until = nowMillis + 24L * 60 * 60 * 1000
+        return if (programs.orEmpty().any { it.endMillis > nowMillis && it.startMillis < until && normalize(it.title).contains(needle) }) 1 else null
+    }
+}

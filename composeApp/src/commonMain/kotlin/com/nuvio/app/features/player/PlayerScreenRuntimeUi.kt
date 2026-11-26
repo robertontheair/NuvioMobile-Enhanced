@@ -517,10 +517,15 @@ private fun PlayerScreenRuntime.RenderPlayerControls(
         if (isLiveTvPlayback) LiveTvRepository.ensureChannelsLoaded()
     }
     val liveTvEpgState by LiveTvRepository.uiState.collectAsStateWithLifecycle()
+    // Total Eclipse: as on the Apple TVs, "Programme · 42m left", with the provider's
+    // markers ("ᴺᵉʷ") taken off the title.
     val liveTvNowProgramTitle = if (isLiveTvPlayback) {
         activeVideoId?.let { channelId -> liveTvEpgState.epgPrograms[channelId] }
             ?.currentProgram(liveTvEpgNowMillis)
-            ?.title
+            ?.let { program ->
+                val title = com.nuvio.app.features.livetv.TotalEclipseGuideTitle.parse(program.title).first
+                "$title · ${com.nuvio.app.features.livetv.totalEclipseTimeLeft(program.endMillis, liveTvEpgNowMillis)}"
+            }
     } else {
         null
     }
@@ -556,7 +561,7 @@ private fun PlayerScreenRuntime.RenderPlayerControls(
             titleLogo = playerTitleLogo,
             showTitleLogo = showPlayerTitleLogo,
             streamTitle = activeStreamTitle,
-            providerName = liveTvNowProgramTitle?.let { programTitle -> "$activeProviderName · $programTitle" } ?: activeProviderName,
+            providerName = liveTvNowProgramTitle ?: activeProviderName,
             seasonNumber = activeSeasonNumber,
             episodeNumber = activeEpisodeNumber,
             episodeTitle = activeEpisodeTitle,
@@ -568,7 +573,8 @@ private fun PlayerScreenRuntime.RenderPlayerControls(
             useLegacyLayout = playerSettingsUiState.useLegacyPlayerLayout,
             showRemainingTime = showRemainingTime,
             onRuntimeClick = { showRemainingTime = !showRemainingTime },
-            releaseInfo = metaUiState.meta?.takeIf { it.id == parentMetaId }?.releaseInfo,
+            // Total Eclipse: live TV shows what's on ("Gutfeld! · 42m left") under the channel name.
+            releaseInfo = if (isLiveTvPlayback) liveTvNowProgramTitle else metaUiState.meta?.takeIf { it.id == parentMetaId }?.releaseInfo,
             badges = playerBadges,
             onNextEpisodeClick = if (nextEpisodeInfo?.hasAired == true && !nextEpisodeAutoPlaySearching && nextEpisodeAutoPlayCountdown == null) {
                 {

@@ -632,7 +632,7 @@ private fun LiveChannelRow(
             }
             if (currentProgram != null) {
                 Text(
-                    text = "${formatLiveTvEpgTime(currentProgram.startMillis)} · ${currentProgram.title}",
+                    text = "${formatLiveTvEpgTime(currentProgram.startMillis)} · ${com.nuvio.app.features.livetv.TotalEclipseGuideTitle.parse(currentProgram.title).first}",
                     color = colorScheme.onSurface.copy(alpha = 0.85f),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
@@ -650,7 +650,7 @@ private fun LiveChannelRow(
             }
             if (nextProgram != null) {
                 Text(
-                    text = "${stringResource(Res.string.live_tv_epg_next)} ${formatLiveTvEpgTime(nextProgram.startMillis)} · ${nextProgram.title}",
+                    text = "${stringResource(Res.string.live_tv_epg_next)} ${formatLiveTvEpgTime(nextProgram.startMillis)} · ${com.nuvio.app.features.livetv.TotalEclipseGuideTitle.parse(nextProgram.title).first}",
                     color = colorScheme.onSurfaceVariant,
                     fontSize = 11.sp,
                     maxLines = 1,

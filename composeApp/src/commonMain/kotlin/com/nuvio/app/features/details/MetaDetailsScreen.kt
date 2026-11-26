@@ -651,16 +651,16 @@ fun MetaDetailsScreen(
                 } else {
                     null
                 }
-                val seriesAction = remember(watchProgressUiState.entries, watchedUiState.items, meta, todayIsoDate, cwPrefs.upNextFromFurthestEpisode, watchedUiState.watchedKeys, shuffleSettings, shuffleVisit, shuffleProfileId) {
-                    if (shuffleSettings.enabled) meta.shufflePrimaryAction(
+                val seriesActionState = remember(watchProgressUiState.entries, watchedUiState.items, meta, todayIsoDate, cwPrefs.upNextFromFurthestEpisode, watchedUiState.watchedKeys, shuffleSettings, shuffleVisit, shuffleProfileId) {
+                    if (shuffleSettings.enabled) (meta.shufflePrimaryAction(
                         profileId = shuffleProfileId,
                         settings = shuffleSettings,
                         entries = watchProgressUiState.entries,
                         watchedKeys = watchedUiState.watchedKeys,
                         visit = shuffleVisit,
-                    ) else {
+                    ) to false) else {
                         EpisodeShuffleRepository.shuffle.clearSelection(shuffleProfileId, meta.id, ShuffleSurface.DETAIL)
-                        meta.seriesPrimaryAction(
+                        val usual = meta.seriesPrimaryAction(
                             entries = watchProgressUiState.entries,
                             watchedItems = watchedUiState.items,
                             watchedKeys = watchedUiState.watchedKeys,
@@ -668,8 +668,15 @@ fun MetaDetailsScreen(
                             preferFurthestEpisode = cwPrefs.upNextFromFurthestEpisode,
                             allowRewatch = true,
                         )
+                        // Total Eclipse: caught up on a show → skipped episode first, else "Airs <date>".
+                        val caughtUp = if ((usual?.resumePositionMs ?: 0L) > 0L) null else {
+                            meta.totalEclipseCaughtUpPlay(watchedUiState.watchedKeys, todayIsoDate)
+                        }
+                        (caughtUp?.action ?: usual) to (caughtUp?.playable == false)
                     }
                 }
+                val seriesAction = seriesActionState.first
+                val caughtUpWaiting = seriesActionState.second
                 val seriesActionVideo = remember(seriesAction, meta.id, meta.videos) {
                     val action = seriesAction ?: return@remember null
                     meta.videos.firstOrNull { video ->
@@ -813,13 +820,13 @@ fun MetaDetailsScreen(
                 }
                 val primaryVideoId = seriesStreamVideoId ?: seriesAction?.videoId ?: meta.id
                 val shufflePoolEmpty = shuffleSettings.enabled && seriesAction == null
-                val isPrimaryPlayEnabled = shufflePoolEmpty || playbackAvailability.canPlay(
+                val isPrimaryPlayEnabled = !caughtUpWaiting && (shufflePoolEmpty || playbackAvailability.canPlay(
                     type = meta.type,
                     videoId = primaryVideoId,
                     parentMetaId = meta.id,
                     seasonNumber = seriesAction?.seasonNumber,
                     episodeNumber = seriesAction?.episodeNumber,
-                )
+                ))
                 val playText = stringResource(Res.string.action_play)
                 val resumeText = stringResource(Res.string.action_resume)
                 val watchAgainText = stringResource(Res.string.action_watch_again)

@@ -939,11 +939,17 @@ private fun PlayerScreenRuntime.BindPlayerMetadataAndSkipEffects() {
         }
         if (shouldShow && !showNextEpisodeCard) {
             showNextEpisodeCard = true
-            if (playerSettingsUiState.streamAutoPlayNextEpisodeEnabled && nextEpisodeInfo?.hasAired == true && !isPartyControlLocked) {
-                playNextEpisode(automatic = true)
-            }
         } else if (!shouldShow) {
             showNextEpisodeCard = false
+        }
+        // Total Eclipse: like the TVs, the next episode starts by itself only when this one has
+        // ended (or its credits were skipped to the end), so the ending isn't cut off. The card
+        // shows earlier with its Play button for anyone who wants to go sooner.
+        if (shouldShow && playbackSnapshot.isEnded && !nextEpisodeAutoPlayAutomatic &&
+            playerSettingsUiState.streamAutoPlayNextEpisodeEnabled &&
+            nextEpisodeInfo?.hasAired == true && !isPartyControlLocked
+        ) {
+            playNextEpisode(automatic = true)
         }
     }
 

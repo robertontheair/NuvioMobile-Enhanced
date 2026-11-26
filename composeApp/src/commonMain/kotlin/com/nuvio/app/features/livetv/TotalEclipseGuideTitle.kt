@@ -80,3 +80,11 @@ internal fun LiveTvGuideTagPill(tag: String, modifier: Modifier = Modifier) {
             .padding(horizontal = 5.dp, vertical = 1.dp),
     )
 }
+
+/** Total Eclipse: "42m left", "1h 5m left" or "2h left", as on the Apple TVs. */
+internal fun totalEclipseTimeLeft(endMillis: Long, nowMillis: Long): String {
+    val minutes = maxOf(1L, (endMillis - nowMillis + 59_999L) / 60_000L)
+    if (minutes < 60) return "${minutes}m left"
+    val rest = minutes % 60
+    return if (rest == 0L) "${minutes / 60}h left" else "${minutes / 60}h ${rest}m left"
+}

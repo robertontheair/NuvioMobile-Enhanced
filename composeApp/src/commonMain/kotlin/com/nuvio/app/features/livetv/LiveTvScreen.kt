@@ -214,16 +214,20 @@ fun LiveTvScreen(
         // Total Eclipse: the clock matters only to On Now filters.
         if (onNowFilter != null) guideShownMillis / 60_000L else 0L,
     ) {
+        // Total Eclipse: as on the TVs, a search covers every channel whatever chip is selected.
+        val searching = searchQuery.isNotBlank()
         val filtered = filterLiveTvChannels(
             channels = uiState.channels,
             favoriteChannelIds = uiState.favoriteChannelIds,
             recentChannelIds = uiState.recentChannelIds,
-            filterMode = filterMode,
-            selectedCategoryName = selectedCategoryName,
+            filterMode = if (searching) LiveTvChannelFilterMode.All else filterMode,
+            selectedCategoryName = if (searching) null else selectedCategoryName,
             searchQuery = searchQuery,
             uncategorizedGroupName = uncategorizedLabel,
+            epgPrograms = uiState.epgPrograms,
         )
-        if (onNowFilter == null) {
+        if (searching) filtered
+        else if (onNowFilter == null) {
             // Total Eclipse: All Channels in category order, as the chips are; event slots last.
             if (filterMode != LiveTvChannelFilterMode.All || searchQuery.isNotBlank()) filtered
             else {
@@ -310,6 +314,7 @@ fun LiveTvScreen(
         uiState.recentChannelIds,
         searchQuery,
         uncategorizedLabel,
+        if (searchQuery.isNotBlank()) uiState.epgPrograms else null,
     ) {
         val searched = filterLiveTvChannels(
             channels = uiState.channels,
@@ -319,6 +324,7 @@ fun LiveTvScreen(
             selectedCategoryName = null,
             searchQuery = searchQuery,
             uncategorizedGroupName = uncategorizedLabel,
+            epgPrograms = uiState.epgPrograms,
         )
         val recentIds = uiState.recentChannelIds.toSet()
         LiveTvChannelChipCounts(
@@ -1813,8 +1819,13 @@ private fun filterLiveTvChannels(
     selectedCategoryName: String?,
     searchQuery: String,
     uncategorizedGroupName: String,
+    epgPrograms: Map<String, List<LiveTvEpgProgram>> = emptyMap(),
 ): List<LiveTvChannel> {
-    val normalizedQuery = searchQuery.trim().lowercase()
+    // Total Eclipse: Global Search's rules (spaces and punctuation ignored, shows in the next
+    // 24 h match too); channels whose name matches come before channels matched by a show.
+    val needle = com.nuvio.app.totaleclipse.TotalEclipseLiveTabSearch.needle(searchQuery)
+    val nowMillis = kotlin.time.Clock.System.now().toEpochMilliseconds()
+    val searchRank = HashMap<String, Int>()
     val recentOrder = recentChannelIds.withIndex().associate { (index, id) -> id to index }
     val filtered = channels
         .asSequence()
@@ -1828,15 +1839,24 @@ private fun filterLiveTvChannels(
             }
         }
         .filter { channel ->
-            normalizedQuery.isBlank() ||
-                channel.name.lowercase().contains(normalizedQuery) ||
-                categoryNameForChannel(channel, uncategorizedGroupName).lowercase().contains(normalizedQuery) ||
-                channel.playlistName.orEmpty().lowercase().contains(normalizedQuery)
+            val rank = com.nuvio.app.totaleclipse.TotalEclipseLiveTabSearch.matchRank(
+                channel = channel,
+                category = categoryNameForChannel(channel, uncategorizedGroupName),
+                programs = epgPrograms[channel.id],
+                needle = needle,
+                nowMillis = nowMillis,
+            )
+            if (rank != null) searchRank[channel.id] = rank
+            rank != null
         }
     return if (filterMode == LiveTvChannelFilterMode.Recents) {
         filtered.sortedBy { recentOrder[it.id] ?: Int.MAX_VALUE }.toList()
     } else {
-        filtered.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name }).toList()
+        filtered.sortedWith(
+            compareBy<LiveTvChannel> { searchRank[it.id] ?: 0 }
+                .thenBy { if (needle.isEmpty()) 0 else if (it.id in favoriteChannelIds) -1 else recentOrder[it.id] ?: Int.MAX_VALUE }
+                .thenBy(String.CASE_INSENSITIVE_ORDER) { it.name },
+        ).toList()
     }
 }
 
