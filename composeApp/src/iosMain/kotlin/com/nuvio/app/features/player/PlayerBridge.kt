@@ -51,6 +51,11 @@ interface NuvioPlayerBridge {
     )
     fun configureAudioOutput(audioOutput: String)
     fun setNightMode(enabled: Boolean, filter: String, label: String)
+    /** Total Eclipse: live TV pause and rewind. */
+    fun setLiveRewindBuffer(enabled: Boolean)
+    fun getLiveSecondsBehind(): Double
+    fun getLiveRewindSeconds(): Double
+    fun jumpToLive()
     fun isNightModeSupported(): Boolean
     fun setPlaybackSpeed(speed: Float)
     fun getVolume(): Float

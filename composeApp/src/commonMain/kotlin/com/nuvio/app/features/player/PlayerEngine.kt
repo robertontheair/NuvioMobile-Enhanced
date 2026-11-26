@@ -26,6 +26,12 @@ interface PlayerEngineController {
         isMuted = false,
     )
     fun setMuted(muted: Boolean) {}
+    /** Total Eclipse: seconds the live picture is behind the newest buffered moment, or null. */
+    fun liveSecondsBehind(): Double? = null
+    /** Total Eclipse: seconds of buffered live picture you can go back, or null. */
+    fun liveRewindSeconds(): Double? = null
+    /** Total Eclipse: back to the newest buffered moment of a live channel. */
+    fun jumpToLive() {}
     fun getAudioTracks(): List<AudioTrack>
     fun getSubtitleTracks(): List<SubtitleTrack>
     fun applyAudioLanguagePreferences(languages: List<String>)

@@ -186,6 +186,10 @@ actual fun PlatformPlayerSurface(
                 bridge.setPlaybackSpeed(speed)
             }
 
+            override fun liveSecondsBehind(): Double? = bridge.getLiveSecondsBehind().takeIf { it >= 0 }
+            override fun liveRewindSeconds(): Double? = bridge.getLiveRewindSeconds().takeIf { it >= 0 }
+            override fun jumpToLive() = bridge.jumpToLive()
+
             override fun currentPlayerVolume(): PlayerAudioLevel {
                 val current = bridge.getVolume().coerceIn(0f, 2f)
                 return PlayerAudioLevel(
@@ -461,6 +465,8 @@ actual fun PlatformPlayerSurface(
                 "hwdec=${latestPlayerSettings.value.iosHardwareDecoderMode.mpvValue} toneMapping=${latestPlayerSettings.value.iosToneMappingMode.mpvValue}",
         )
         bridge.applyIosVideoOutputSettings(latestPlayerSettings.value)
+        // Total Eclipse: live channels get the disk-backed pause and rewind buffer.
+        bridge.setLiveRewindBuffer(liveStream)
         bridge.loadFileWithAudio(
             videoUrl = sourceUrl,
             audioUrl = sourceAudioUrl,

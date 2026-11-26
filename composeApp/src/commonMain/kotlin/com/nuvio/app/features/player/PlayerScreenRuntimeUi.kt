@@ -22,6 +22,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import kotlinx.coroutines.delay
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.key
@@ -485,6 +486,17 @@ private fun PlayerScreenRuntime.RenderPlayerControls(
     modifier: Modifier,
 ) {
     val isInPip = rememberIsInPictureInPicture()
+    // Total Eclipse: where a live channel's picture is in its rewind buffer, read once a second.
+    var liveSecondsBehind by remember { mutableStateOf<Double?>(null) }
+    var liveRewindSeconds by remember { mutableStateOf<Double?>(null) }
+    LaunchedEffect(isLiveTvPlayback, playerController) {
+        if (!isLiveTvPlayback) { liveSecondsBehind = null; liveRewindSeconds = null; return@LaunchedEffect }
+        while (true) {
+            liveSecondsBehind = playerController?.liveSecondsBehind()
+            liveRewindSeconds = playerController?.liveRewindSeconds()
+            kotlinx.coroutines.delay(1_000)
+        }
+    }
     val seekPreview = rememberSeekPreviewController(
         url = activePlaybackSourceUrl?.takeIf {
             playerSettingsUiState.seekPreviewEnabled &&
@@ -601,7 +613,9 @@ private fun PlayerScreenRuntime.RenderPlayerControls(
             onSeekForward = { seekBy(skipStepMs(PlayerSeekDirection.Forward)) },
             skipBackwardSeconds = playerSettingsUiState.skipBackwardSeconds,
             skipForwardSeconds = playerSettingsUiState.skipForwardSeconds,
-            showSkipButtons = playerSettingsUiState.showSkipButtons && !isLiveTvPlayback,
+            // Total Eclipse: on live TV the skip buttons appear once there's buffer to go back into.
+            showSkipButtons = playerSettingsUiState.showSkipButtons &&
+                (!isLiveTvPlayback || (liveRewindSeconds ?: 0.0) > 10.0 || (liveSecondsBehind ?: 0.0) > 10.0),
             onResizeModeClick = { cycleResizeMode() },
             onSpeedClick = if (!isLiveTvPlayback) {
                 {
@@ -807,6 +821,17 @@ private fun PlayerScreenRuntime.RenderPlayerControls(
                 controlsActivityTick += 1
             },
         )
+        // Total Eclipse: live TV pause and rewind. "LIVE" at the live edge; behind it, how far
+        // and a Back to Live button.
+        if (isLiveTvPlayback) {
+            TotalEclipseLiveEdgePill(
+                secondsBehind = liveSecondsBehind,
+                onBackToLive = {
+                    playerController?.jumpToLive()
+                    controlsActivityTick += 1
+                },
+            )
+        }
     }
     AnimatedVisibility(
         visible = folded && playerControlsLocked && !isInPip,

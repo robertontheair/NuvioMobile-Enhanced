@@ -137,6 +137,13 @@ final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
     func configureAudioOutput(audioOutput: String) {
         ensurePlayerViewController().configureAudioOutput(audioOutput: audioOutput)
     }
+    // Total Eclipse: live TV pause and rewind (a disk-backed buffer while a live channel plays).
+    func setLiveRewindBuffer(enabled: Bool) { ensurePlayerViewController().setLiveRewindBuffer(enabled) }
+    /** Seconds behind the newest buffered live moment (-1 when unknown). */
+    func getLiveSecondsBehind() -> Double { playerVC?.liveBufferPosition()?.behind ?? -1 }
+    /** Seconds of buffered picture before the playback position (-1 when unknown). */
+    func getLiveRewindSeconds() -> Double { playerVC?.liveBufferPosition()?.rewind ?? -1 }
+    func jumpToLive() { playerVC?.jumpToLive() }
     func isNightModeSupported() -> Bool { MPVPlayerViewController.nightModeSupported }
     func setNightMode(enabled: Bool, filter: String, label: String) {
         ensurePlayerViewController().setNightMode(enabled, filter: (filter: filter, label: label))
@@ -2887,6 +2894,94 @@ final class MPVPlayerViewController: UIViewController {
     private func readCurrentVideoHeight() -> Int {
         let height = getInt("video-out-params/h")
         return height > 0 ? height : getInt("video-params/h")
+    }
+
+    // MARK: - Total Eclipse: live TV pause and rewind
+
+    /// While a live channel plays, mpv's cache moves to disk (Library/Caches/LiveRewind) and grows
+    /// to about 1.5 GB: 768 MB behind the playback position (rewind; about 20–30 minutes of an
+    /// HD channel) and 768 MB ahead (a paused channel keeps buffering, so it can be caught up
+    /// later). Seeking inside it is done from the cache, never from the provider. Films and
+    /// episodes keep the in-memory defaults. Set before `loadfile`; the files go when it's off.
+    private var liveRewindBufferEnabled = false
+    private static let liveBufferAheadBytes = 768 * 1024 * 1024
+    private static let liveBufferBackBytes = 768 * 1024 * 1024
+
+    private static var liveCacheDirectory: String {
+        let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+        return caches.appendingPathComponent("LiveRewind", isDirectory: true).path
+    }
+
+    func setLiveRewindBuffer(_ enabled: Bool) {
+        guard enabled != liveRewindBufferEnabled else { return }
+        liveRewindBufferEnabled = enabled
+        let directory = Self.liveCacheDirectory
+        try? FileManager.default.removeItem(atPath: directory)
+        if enabled {
+            try? FileManager.default.createDirectory(atPath: directory, withIntermediateDirectories: true)
+            setStringProperty("demuxer-cache-dir", directory)
+            setStringProperty("cache", "yes")
+            setStringProperty("cache-on-disk", "yes")
+            setStringProperty("demuxer-seekable-cache", "yes")
+            setStringProperty("demuxer-max-bytes", "\(Self.liveBufferAheadBytes)")
+            setStringProperty("demuxer-max-back-bytes", "\(Self.liveBufferBackBytes)")
+        } else {
+            setStringProperty("cache-on-disk", "no")
+            setStringProperty("demuxer-seekable-cache", "auto")
+            setStringProperty("cache", "auto")
+            setStringProperty("demuxer-max-bytes", "\(Self.isMemoryConstrained ? Self.constrainedDemuxerMaxBytes : Self.demuxerMaxBytes)")
+            setStringProperty("demuxer-max-back-bytes", "\(Self.isMemoryConstrained ? Self.constrainedDemuxerMaxBackBytes : Self.demuxerMaxBackBytes)")
+        }
+        InAppLogBridge.shared.info(tag: "MPV/iOS", message: "live rewind buffer \(enabled ? "on" : "off")")
+    }
+
+    /// The buffered stretch around the playback position: seconds behind its newest moment
+    /// (how far from live) and seconds before the position (how far back you can go).
+    func liveBufferPosition() -> (behind: Double, rewind: Double)? {
+        guard liveRewindBufferEnabled, let ctx = mpv else { return nil }
+        let position = getDouble("time-pos")
+        var node = mpv_node()
+        guard mpv_get_property(ctx, "demuxer-cache-state", MPV_FORMAT_NODE, &node) >= 0 else { return nil }
+        defer { mpv_free_node_contents(&node) }
+        guard let range = Self.seekableRange(in: node, containing: position) else { return nil }
+        return (max(0, range.end - position), max(0, position - range.start))
+    }
+
+    /// Back to the newest buffered moment (a couple of seconds short, so it doesn't stall).
+    func jumpToLive() {
+        guard let range = liveBufferPosition() else { return }
+        let target = range.behind - 2
+        guard target > 1 else { return }
+        command("seek", args: [String(format: "%.2f", target), "relative+exact"], checkForErrors: false)
+    }
+
+    private static func seekableRange(in node: mpv_node, containing position: Double) -> (start: Double, end: Double)? {
+        guard node.format == MPV_FORMAT_NODE_MAP, let map = node.u.list?.pointee else { return nil }
+        for i in 0..<Int(map.num) {
+            guard let key = map.keys?[i], String(cString: key) == "seekable-ranges" else { continue }
+            let rangesNode = map.values[i]
+            guard rangesNode.format == MPV_FORMAT_NODE_ARRAY, let ranges = rangesNode.u.list?.pointee else { return nil }
+            var best: (start: Double, end: Double)?
+            for r in 0..<Int(ranges.num) {
+                let rangeNode = ranges.values[r]
+                guard rangeNode.format == MPV_FORMAT_NODE_MAP, let fields = rangeNode.u.list?.pointee else { continue }
+                var start: Double?
+                var end: Double?
+                for f in 0..<Int(fields.num) {
+                    guard let name = fields.keys?[f], fields.values[f].format == MPV_FORMAT_DOUBLE else { continue }
+                    switch String(cString: name) {
+                    case "start": start = fields.values[f].u.double_
+                    case "end": end = fields.values[f].u.double_
+                    default: break
+                    }
+                }
+                guard let s = start, let e = end else { continue }
+                if position >= s - 1, position <= e + 1 { return (s, e) }
+                if best == nil || e > best!.end { best = (s, e) }
+            }
+            return best
+        }
+        return nil
     }
 
     // MARK: - MPV Helpers
