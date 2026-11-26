@@ -22,6 +22,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.SportsSoccer
 import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.NotificationsOff
 import androidx.compose.material.icons.rounded.StarBorder
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
@@ -436,6 +438,8 @@ internal fun LiveTvSportsControls(
     hasMyTeams: Boolean = false,
     hideScores: Boolean = false,
     onHideScoresChange: ((Boolean) -> Unit)? = null,
+    gameAlertsOn: Boolean = true,
+    onGameAlertsChange: ((Boolean) -> Unit)? = null,
 ) {
     val tokens = MaterialTheme.nuvio
     Row(
@@ -481,6 +485,20 @@ internal fun LiveTvSportsControls(
                     count = counts[league.id],
                 )
             }
+        }
+        // Total Eclipse: alerts before your teams' games (shown once you follow a team).
+        if (onGameAlertsChange != null) {
+            Icon(
+                imageVector = if (gameAlertsOn) Icons.Rounded.Notifications else Icons.Rounded.NotificationsOff,
+                contentDescription = if (gameAlertsOn) "Turn off game alerts" else "Turn on game alerts",
+                tint = if (gameAlertsOn) tokens.colors.accent else tokens.colors.textMuted,
+                modifier = Modifier
+                    .padding(start = 4.dp)
+                    .clip(CircleShape)
+                    .clickable { onGameAlertsChange(!gameAlertsOn) }
+                    .padding(8.dp)
+                    .size(20.dp),
+            )
         }
         // Total Eclipse: Hide Scores keeps results off the screen until you want them.
         if (onHideScoresChange != null) {

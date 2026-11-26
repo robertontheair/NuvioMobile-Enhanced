@@ -1,5 +1,9 @@
 package com.nuvio.app.totaleclipse
 
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -71,6 +75,7 @@ internal fun TotalEclipsePosterBadgeBox(
     val coming = if (weekLabel != null) weekLabel else TotalEclipsePosterBadges.comingSoonLabel(item)
     Box {
         content()
+        TotalEclipseFavoriteHeart(item)
         if (rank != null) {
             Text(
                 text = "$rank",
@@ -118,5 +123,23 @@ internal fun BoxScope.TotalEclipseComingPill(item: MetaPreview) {
             .background(Color.Black.copy(alpha = 0.72f), RoundedCornerShape(50))
             .border(1.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(50))
             .padding(horizontal = 7.dp, vertical = 3.dp),
+    )
+}
+
+/** Total Eclipse: a small heart at the bottom right of posters you've favourited on Trakt. */
+@Composable
+internal fun BoxScope.TotalEclipseFavoriteHeart(item: MetaPreview) {
+    val keys by TotalEclipseFavorites.keys.collectAsState()
+    if (TotalEclipseFavorites.key(item.type, item.id) !in keys) return
+    androidx.compose.material3.Icon(
+        imageVector = androidx.compose.material.icons.Icons.Rounded.Favorite,
+        contentDescription = "Favorite",
+        tint = Color(0xFFFF4D6D),
+        modifier = Modifier
+            .align(Alignment.BottomEnd)
+            .padding(6.dp)
+            .background(Color.Black.copy(alpha = 0.55f), androidx.compose.foundation.shape.CircleShape)
+            .padding(4.dp)
+            .size(14.dp),
     )
 }

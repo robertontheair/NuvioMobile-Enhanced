@@ -18,6 +18,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.CheckCircleOutline
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Info
@@ -2308,6 +2310,19 @@ internal fun MainAppContent(
                                     }
                                 },
                             ),
+                        ) + (
+                            // Total Eclipse: Favorite (Trakt's heart) from the poster, as on the Apple TVs
+                            // (with Trakt connected, as on Details).
+                            if (com.nuvio.app.features.trakt.TraktAuthRepository.hasRequiredCredentials()) {
+                                val favourite = com.nuvio.app.totaleclipse.TotalEclipseFavorites.isFavorite(preview.type, preview.id)
+                                listOf(
+                                    PosterZoomOverlayAction(
+                                        icon = if (favourite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                        label = if (favourite) "Remove from Favorites" else "Favorite",
+                                        onSelected = { com.nuvio.app.totaleclipse.TotalEclipseFavorites.toggle(preview.type, preview.id) },
+                                    ),
+                                )
+                            } else emptyList()
                         ),
                         backdrop = posterOverlayBackdrop,
                         onDismissed = {

@@ -74,6 +74,7 @@ import nuvio.composeapp.generated.resources.shuffle_stop
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
+import androidx.compose.material.icons.automirrored.rounded.List
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.rounded.Replay
@@ -476,6 +477,10 @@ private fun detailActionSet(
         }
         add(watchedAction)
         add(saveAction)
+        // Total Eclipse: Lists as its own button, as on the Apple TVs (it was only a long press on Save).
+        onSaveLongClick?.let { openLists ->
+            add(DetailSecondaryAction(label = "Lists", icon = Icons.AutoMirrored.Rounded.List, onClick = openLists))
+        }
         // Total Eclipse: Trakt ♥, as on the Apple TVs (only with Trakt connected).
         totalEclipseFavoriteAction()?.let(::add)
     }

@@ -433,6 +433,14 @@ fun LiveTvScreen(
     LaunchedEffect(Unit) { com.nuvio.app.totaleclipse.TotalEclipseSportsPrefs.load() }
     val followedTeams by com.nuvio.app.totaleclipse.TotalEclipseSportsPrefs.teams.collectAsStateWithLifecycle()
     val hideScores by com.nuvio.app.totaleclipse.TotalEclipseSportsPrefs.hideScores.collectAsStateWithLifecycle()
+    // Total Eclipse: alerts five minutes before your teams' games (scheduled as the list refreshes).
+    LaunchedEffect(sportsState.events, followedTeams, sportsMatches) {
+        if (sportsState.events.isEmpty()) return@LaunchedEffect
+        com.nuvio.app.totaleclipse.TotalEclipseGameAlerts.sync(sportsState.events, followedTeams) { event ->
+            sportsMatches["${event.league.id}:${event.id}"].orEmpty()
+        }
+    }
+    val gameAlertsOn by com.nuvio.app.totaleclipse.TotalEclipseGameAlerts.enabled.collectAsStateWithLifecycle()
     val myTeamCount = remember(sportsState.events, followedTeams) {
         sportsState.events.count { com.nuvio.app.totaleclipse.TotalEclipseSportsPrefs.involvesFollowed(it, followedTeams) }
     }
@@ -699,6 +707,8 @@ fun LiveTvScreen(
                             hasMyTeams = myTeamCount > 0,
                             hideScores = hideScores,
                             onHideScoresChange = com.nuvio.app.totaleclipse.TotalEclipseSportsPrefs::setHideScores,
+                            gameAlertsOn = gameAlertsOn,
+                            onGameAlertsChange = if (followedTeams.isNotEmpty()) com.nuvio.app.totaleclipse.TotalEclipseGameAlerts::setEnabled else null,
                         )
                     }
                     if (section == LiveTvSection.OnDemand && hasVodProvider) {

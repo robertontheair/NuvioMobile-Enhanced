@@ -698,11 +698,19 @@ fun MetaDetailsScreen(
                 }
                 // Total Eclipse: as on the Apple TVs, a show you're partway through leads with your
                 // episode ("S2 E5 · Title" and its synopsis) instead of the show's description.
-                val leadMeta = remember(meta, seriesAction, seriesActionVideo) {
+                // Total Eclipse: "#2 in Movies This Week" when the title is in Trakt's Top 10, as on the TVs.
+                val top10Kind = if (meta.type == "movie") com.nuvio.app.totaleclipse.TotalEclipseBrowseKind.Movies
+                    else com.nuvio.app.totaleclipse.TotalEclipseBrowseKind.Shows
+                val top10 by com.nuvio.app.totaleclipse.TotalEclipsePersonalRows.state(top10Kind).collectAsStateWithLifecycle()
+                val top10Line = remember(top10.top10, meta.id, meta.name) {
+                    val index = top10.top10.indexOfFirst { it.id == meta.id || (it.name.equals(meta.name, true) && it.releaseInfo?.take(4) == meta.releaseInfo?.take(4)) }
+                    if (index < 0) null else "#${index + 1} in ${if (meta.type == "movie") "Movies" else "Shows"} This Week"
+                }
+                val leadMeta = remember(meta, seriesAction, seriesActionVideo, top10Line) {
                     val video = seriesActionVideo
                     val label = seriesAction?.label.orEmpty()
                     if (video == null || video.season == null || video.episode == null || label.startsWith("Play")) {
-                        meta
+                        if (top10Line == null) meta else meta.copy(description = listOfNotNull(top10Line, meta.description).joinToString("\n"))
                     } else {
                         val title = video.title.trim()
                         val head = "S${video.season} E${video.episode}" + if (title.isEmpty()) "" else " · $title"
