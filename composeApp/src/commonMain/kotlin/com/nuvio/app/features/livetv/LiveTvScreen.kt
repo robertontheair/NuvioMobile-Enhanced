@@ -109,6 +109,7 @@ import androidx.compose.material.icons.automirrored.rounded.ViewList
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.GridView
+import androidx.compose.material.icons.rounded.Dashboard
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.aspectRatio
 import nuvio.composeapp.generated.resources.live_tv_filter_recents
@@ -425,6 +426,9 @@ fun LiveTvScreen(
         val present = sportsState.events.map { it.league.id }.toSet()
         liveTvSportsLeagues.filter { it.id in present }
     }
+    // Total Eclipse: Multiview opens from here, full screen over the app.
+    com.nuvio.app.totaleclipse.TotalEclipseMultiviewHost()
+
     // Total Eclipse: followed teams and Hide Scores, per profile.
     LaunchedEffect(Unit) { com.nuvio.app.totaleclipse.TotalEclipseSportsPrefs.load() }
     val followedTeams by com.nuvio.app.totaleclipse.TotalEclipseSportsPrefs.teams.collectAsStateWithLifecycle()
@@ -579,6 +583,20 @@ fun LiveTvScreen(
                                     ),
                                     onClick = {
                                         LiveTvRepository.setChannelGridEnabled(!uiState.isChannelGridEnabled)
+                                    },
+                                )
+                            }
+                            // Total Eclipse: Multiview, on screens wide enough to share.
+                            if (uiState.hasPlaylist && com.nuvio.app.totaleclipse.totalEclipseMultiviewAvailable()) {
+                                NuvioIconActionButton(
+                                    icon = Icons.Rounded.Dashboard,
+                                    contentDescription = "Multiview",
+                                    onClick = {
+                                        val live = LiveTvRepository.uiState.value
+                                        val byId = live.channels.associateBy { it.id }
+                                        val start = live.recentChannelIds.mapNotNull(byId::get).take(1)
+                                            .ifEmpty { live.channels.take(1) }
+                                        com.nuvio.app.totaleclipse.TotalEclipseMultiview.open(start)
                                     },
                                 )
                             }

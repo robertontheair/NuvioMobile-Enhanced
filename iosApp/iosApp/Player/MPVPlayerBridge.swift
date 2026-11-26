@@ -157,6 +157,9 @@ final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
     func setVolume(volume: Float) { playerVC?.setVolume(volume) }
     func setMuted(muted: Bool) { playerVC?.setMuted(muted) }
     func setEmbeddedPreviewMode(enabled: Bool) { ensurePlayerViewController().setEmbeddedPreviewMode(enabled) }
+    /// Total Eclipse: a Multiview pane plays alongside the others (embedded, so starting one
+    /// doesn't stop the rest) but with sound, so the audio session must be on.
+    func setMultiviewPane(enabled: Bool) { ensurePlayerViewController().setMultiviewPane(enabled) }
     func setResizeMode(mode: Int32) { playerVC?.setResize(Int(mode)) }
     func syncVideoSurfaceLayout(width: Double, height: Double) {
         playerVC?.syncVideoSurfaceLayout(size: CGSize(width: width, height: height))
@@ -1852,6 +1855,11 @@ final class MPVPlayerViewController: UIViewController {
             setNeedsUpdateOfScreenEdgesDeferringSystemGestures()
             layoutPlayerSurfaces()
         }
+    }
+
+    func setMultiviewPane(_ enabled: Bool) {
+        setEmbeddedPreviewMode(enabled)
+        if enabled { activateAudioSessionForPlayback() }
     }
 
     func setMuted(_ muted: Bool) {

@@ -62,6 +62,8 @@ interface NuvioPlayerBridge {
     fun setVolume(volume: Float)
     fun setMuted(muted: Boolean)
     fun setEmbeddedPreviewMode(enabled: Boolean)
+    /** Total Eclipse: an embedded player with sound, for Multiview. */
+    fun setMultiviewPane(enabled: Boolean)
     fun setResizeMode(mode: Int) // 0=Fit, 1=Fill, 2=Zoom
     fun syncVideoSurfaceLayout(width: Double, height: Double)
     fun getAudioTrackCount(): Int

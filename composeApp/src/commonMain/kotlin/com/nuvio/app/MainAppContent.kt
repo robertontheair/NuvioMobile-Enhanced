@@ -1553,6 +1553,18 @@ internal fun MainAppContent(
         }
         val onLiveTvChannelClick: (LiveTvChannel) -> Unit = { channel -> playLiveChannel(channel, false) }
 
+        // Total Eclipse: a Multiview pane chosen to watch full screen.
+        LaunchedEffect(Unit) {
+            if (!ownsAppRuntime) return@LaunchedEffect
+            com.nuvio.app.totaleclipse.TotalEclipseMultiview.openFull.collect { channel ->
+                if (channel != null) {
+                    com.nuvio.app.totaleclipse.TotalEclipseMultiview.consumeOpenFull()
+                    LiveTvRepository.markChannelWatched(channel)
+                    onLiveTvChannelClick(channel)
+                }
+            }
+        }
+
         // Total Eclipse: channel up/down / Last Channel from the live player.
         LaunchedEffect(Unit) {
             if (!ownsAppRuntime) return@LaunchedEffect
