@@ -349,12 +349,11 @@ internal fun PlayerControlActions(
     val toolbarLayout = playerSettings.toolbarLayout
     val primaryActions = toolbarLayout.visibleButtons.mapNotNull(availableActions::get)
     val secondaryActions = toolbarLayout.hiddenButtons.mapNotNull(availableActions::get)
-    val hasOverflow = secondaryActions.isNotEmpty()
-    var expanded by remember(hasOverflow) { mutableStateOf(false) }
+    // Total Eclipse (Rob, 2026-11-25): the strip is always expanded, every button showing; it
+    // scrolls sideways when they don't fit. No chevron to fold it away.
+    val hasOverflow = false
+    val expanded = true
     val scrollState = rememberScrollState()
-    LaunchedEffect(expanded, scrollState.maxValue) {
-        if (expanded) scrollState.animateScrollTo(scrollState.maxValue) else scrollState.scrollTo(0)
-    }
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = PlayerTimelineContentInset),
@@ -387,18 +386,6 @@ internal fun PlayerControlActions(
                             )
                             action.popup?.invoke()
                         }
-                    }
-                    if (hasOverflow) {
-                        PlayerAction(
-                            description = stringResource(
-                                if (expanded) Res.string.compose_player_fewer_actions else Res.string.compose_player_more_actions,
-                            ),
-                            onClick = {
-                                expanded = !expanded
-                                onInteraction()
-                            },
-                            icon = if (expanded) Icons.AutoMirrored.Rounded.KeyboardArrowLeft else Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                        )
                     }
                 }
             }
