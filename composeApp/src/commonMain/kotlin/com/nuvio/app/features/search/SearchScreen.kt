@@ -348,10 +348,12 @@ fun SearchScreen(
                 modifier = Modifier.weight(1f),
             ) {
                 if (query.isBlank()) {
-                    if (isSearchFocused && recentSearches.isNotEmpty()) {
+                    // Total Eclipse: recent searches always show while the field is empty (not only
+                    // while it has focus), newest 8, with Clear All — as on the Apple TVs.
+                    if (recentSearches.isNotEmpty()) {
                         item(key = "recent_searches") {
                             SearchRecentSection(
-                                recentSearches = recentSearches,
+                                recentSearches = recentSearches.take(8),
                                 onSearchPress = { recentQuery -> query = recentQuery },
                                 onRemoveSearch = SearchHistoryRepository::removeSearch,
                             )
@@ -543,11 +545,22 @@ private fun SearchRecentSection(
             .padding(horizontal = 16.dp, vertical = 4.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Text(
-            text = stringResource(Res.string.compose_search_recent_searches),
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-            color = MaterialTheme.colorScheme.onBackground,
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = stringResource(Res.string.compose_search_recent_searches),
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = "Clear All",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .clickable { SearchHistoryRepository.clearAll() }
+                    .padding(horizontal = 4.dp, vertical = 6.dp),
+            )
+        }
         Spacer(modifier = Modifier.height(4.dp))
         recentSearches.forEach { recentQuery ->
             SearchRecentRow(

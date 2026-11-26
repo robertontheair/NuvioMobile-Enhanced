@@ -1,5 +1,6 @@
 package com.nuvio.app.features.home.components
 
+import com.nuvio.app.totaleclipse.TotalEclipseComingPill
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -181,6 +182,7 @@ private fun PosterGridTile(
                 )
             }
             NuvioPosterWatchedOverlay(isWatched = isWatched, episodesLeft = com.nuvio.app.totaleclipse.rememberTotalEclipseEpisodesLeft(item))
+            TotalEclipseComingPill(item)
         }
         if (!hideLabels) {
             Text(

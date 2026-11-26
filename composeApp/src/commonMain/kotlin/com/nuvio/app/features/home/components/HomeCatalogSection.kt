@@ -97,7 +97,10 @@ private fun HomeCatalogRowSectionContent(
         } else {
             null
         }
-        com.nuvio.app.totaleclipse.TotalEclipsePosterBadgeBox(item = item, rank = rank) {
+        val weekLabel = if (section.key.startsWith(com.nuvio.app.totaleclipse.TotalEclipsePosterBadges.NEW_THIS_WEEK_KEY)) {
+            com.nuvio.app.totaleclipse.TotalEclipsePosterBadges.newThisWeekLabels[item.id]
+        } else null
+        com.nuvio.app.totaleclipse.TotalEclipsePosterBadgeBox(item = item, rank = rank, weekLabel = weekLabel) {
         HomePosterCard(
             item = item,
             useLandscapeBackdropMode = posterCardStyle.catalogLandscapeModeEnabled,

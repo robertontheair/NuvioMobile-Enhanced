@@ -1,5 +1,6 @@
 package com.nuvio.app.features.catalog
 
+import com.nuvio.app.totaleclipse.TotalEclipseComingPill
 import com.nuvio.app.core.ui.background.appBackgroundCover
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -347,6 +348,7 @@ private fun CatalogPosterTile(
                 )
             }
             NuvioPosterWatchedOverlay(isWatched = isWatched, episodesLeft = com.nuvio.app.totaleclipse.rememberTotalEclipseEpisodesLeft(item))
+            TotalEclipseComingPill(item)
         }
         if (!hideLabels) {
             Text(

@@ -54,6 +54,10 @@ internal object TotalEclipsePosterBadges {
     }
 
     const val TOP10_PREFIX = "totaleclipse_top10"
+    const val NEW_THIS_WEEK_KEY = "totaleclipse_new_this_week"
+
+    /** Show id → "TODAY · S2 E5" for the New This Week row. */
+    val newThisWeekLabels = mutableMapOf<String, String>()
 }
 
 /** Wraps a poster with the TVs' badges; [rank] is set only on the Top 10 row. */
@@ -61,9 +65,10 @@ internal object TotalEclipsePosterBadges {
 internal fun TotalEclipsePosterBadgeBox(
     item: MetaPreview,
     rank: Int?,
+    weekLabel: String? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    val coming = TotalEclipsePosterBadges.comingSoonLabel(item)
+    val coming = if (weekLabel != null) weekLabel else TotalEclipsePosterBadges.comingSoonLabel(item)
     Box {
         content()
         if (rank != null) {
@@ -95,4 +100,23 @@ internal fun TotalEclipsePosterBadgeBox(
             )
         }
     }
+}
+
+/** Total Eclipse: the "COMING DEC 18" pill on its own, for poster grids (top left). */
+@Composable
+internal fun BoxScope.TotalEclipseComingPill(item: MetaPreview) {
+    val coming = TotalEclipsePosterBadges.comingSoonLabel(item) ?: return
+    Text(
+        text = coming,
+        color = Color.White,
+        fontSize = 10.sp,
+        fontWeight = FontWeight.Bold,
+        maxLines = 1,
+        modifier = Modifier
+            .align(Alignment.TopStart)
+            .padding(6.dp)
+            .background(Color.Black.copy(alpha = 0.72f), RoundedCornerShape(50))
+            .border(1.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(50))
+            .padding(horizontal = 7.dp, vertical = 3.dp),
+    )
 }

@@ -59,6 +59,15 @@ object SearchHistoryRepository {
         persist()
     }
 
+    /** Total Eclipse: one Clear for all recent searches, as on the Apple TVs. */
+    fun clearAll() {
+        ensureLoaded()
+        if (recentSearches.isEmpty()) return
+        recentSearches = emptyList()
+        publish()
+        persist()
+    }
+
     fun removeSearch(query: String) {
         ensureLoaded()
         val updatedSearches = recentSearches.filterNot { it == query }

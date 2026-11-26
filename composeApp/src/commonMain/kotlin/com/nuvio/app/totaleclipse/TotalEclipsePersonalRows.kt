@@ -241,10 +241,30 @@ internal object TotalEclipsePersonalRows {
         return cached("newweek|$profile|$start", NEW_THIS_WEEK_MS, force) {
             val body = traktGet(headers, "calendars/my/shows/$start/7?extended=full,images", "calendar")
                 ?: return@cached null
-            json.decodeFromString<List<CalendarShowDto>>(body)
+            val entries = json.decodeFromString<List<CalendarShowDto>>(body)
                 .sortedByDescending { it.firstAired.orEmpty() }
-                .mapNotNull { it.show?.toPreview("series") }
-                .distinctBy { it.id }
+            val previews = entries.mapNotNull { e -> e.show?.toPreview("series")?.let { it to e } }
+                .distinctBy { it.first.id }
+            // Total Eclipse: as on the TVs, each card says when its newest episode aired and
+            // which one it is ("TODAY · S2 E5", "MONDAY · S1 E8").
+            previews.forEach { (preview, e) ->
+                val day = newThisWeekDay(e.firstAired) ?: return@forEach
+                val ep = e.episode?.let { ep -> if (ep.season != null && ep.number != null) " · S${ep.season} E${ep.number}" else "" }.orEmpty()
+                TotalEclipsePosterBadges.newThisWeekLabels[preview.id] = day + ep
+            }
+            previews.map { it.first }
+        }
+    }
+
+    private fun newThisWeekDay(firstAired: String?): String? {
+        val instant = firstAired?.let { runCatching { kotlin.time.Instant.parse(it) }.getOrNull() } ?: return null
+        val zone = kotlinx.datetime.TimeZone.currentSystemDefault()
+        val day = instant.toLocalDateTime(zone).date
+        val now = today()
+        return when (day) {
+            now -> "TODAY"
+            now.plus(-1, DateTimeUnit.DAY) -> "YESTERDAY"
+            else -> day.dayOfWeek.name
         }
     }
 
@@ -701,7 +721,14 @@ internal object TotalEclipsePersonalRows {
     @Serializable
     private data class CalendarShowDto(
         @SerialName("first_aired") val firstAired: String? = null,
+        val episode: CalendarEpisodeDto? = null,
         val show: TraktMediaDto? = null,
+    )
+
+    @Serializable
+    private data class CalendarEpisodeDto(
+        val season: Int? = null,
+        val number: Int? = null,
     )
 
     @Serializable
