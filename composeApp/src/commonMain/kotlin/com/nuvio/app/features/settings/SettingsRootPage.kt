@@ -33,6 +33,7 @@ import com.nuvio.app.core.ui.themePalette
 import com.nuvio.app.features.profiles.ProfileRepository
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Groups
+import androidx.compose.material.icons.rounded.Tv
 import androidx.compose.runtime.Composable
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.StringResource
@@ -62,6 +63,8 @@ internal fun LazyListScope.settingsRootContent(
                             isTablet = isTablet,
                             onPageClick = onPageClick,
                         )
+                        SettingsGroupDivider(isTablet = isTablet)
+                        TotalEclipseHouseholdRow(isTablet = isTablet)
                         if (onWatchPartyClick != null) {
                             SettingsGroupDivider(isTablet = isTablet)
                             SettingsNavigationRow(
@@ -152,6 +155,29 @@ internal fun LazyListScope.settingsRootContent(
         }
     }
     settingsFooterContent(isTablet = isTablet)
+}
+
+/** Total Eclipse: where the phone stands with the Apple TVs' household; tap to read it again. */
+@Composable
+private fun TotalEclipseHouseholdRow(isTablet: Boolean) {
+    val status by com.nuvio.app.totaleclipse.HouseholdSync.status.collectAsStateWithLifecycle()
+    val description = when {
+        status.checking -> "Checking iCloud…"
+        status.failed -> "Couldn't read the Apple TVs' settings. Tap to try again."
+        status.found == false -> "No Apple TV household in this iCloud account yet."
+        status.at != null -> "Settings from your Apple TVs · checked " +
+            com.nuvio.app.features.livetv.formatLiveTvEpgTime(status.at!!)
+        else -> "Settings, profiles and Live TV come from your Apple TVs."
+    }
+    SettingsNavigationRow(
+        title = "Apple TV Household",
+        description = description,
+        icon = Icons.Rounded.Tv,
+        enabled = !status.checking,
+        isTablet = isTablet,
+        trailingContent = {},
+        onClick = { com.nuvio.app.totaleclipse.HouseholdSync.syncNow() },
+    )
 }
 
 @Composable

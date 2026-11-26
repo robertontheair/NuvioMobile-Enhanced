@@ -724,6 +724,11 @@ fun LibraryScreen(
                         { showTorboxConnectDialog = true }
                     },
                 )
+            } else if (sourceMode == LibraryViewMode.History) {
+                totalEclipseHistoryContent(
+                    items = watchedUiState.items,
+                    onOpen = { onPosterClick?.invoke(it) },
+                )
             } else if (sourceMode == LibraryViewMode.Servers) {
                 serverLibraryContent(
                     shelves = serverShelves,
@@ -1179,6 +1184,11 @@ private fun LibrarySourceSwitch(
                 label = stringResource(Res.string.library_source_cloud),
                 selected = selectedMode == LibraryViewMode.Cloud,
                 onClick = { onModeSelected(LibraryViewMode.Cloud) },
+            )
+            LibraryChip(
+                label = "History",
+                selected = selectedMode == LibraryViewMode.History,
+                onClick = { onModeSelected(LibraryViewMode.History) },
             )
             if (showServers) {
                 LibraryChip(

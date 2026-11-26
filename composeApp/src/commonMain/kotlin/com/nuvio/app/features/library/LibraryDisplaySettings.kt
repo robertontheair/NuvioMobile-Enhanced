@@ -43,7 +43,9 @@ enum class LibraryViewMode {
     Saved,
     Downloaded,
     Cloud,
-    Servers;
+    Servers,
+    /** Total Eclipse: what you've watched, newest first. */
+    History;
 
     /** Saved and Downloaded both show titles in library sections, with the same layout and sorting. */
     val showsLibrarySections: Boolean

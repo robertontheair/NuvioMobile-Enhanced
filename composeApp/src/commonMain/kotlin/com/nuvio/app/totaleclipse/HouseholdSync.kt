@@ -47,6 +47,15 @@ internal object HouseholdSync {
     /** The logs for phone profile [slot], or null when they're another profile's (or not read yet). */
     fun liveLogsFor(slot: Int): Pair<String?, String?>? = liveLogs?.takeIf { it.first == slot }?.second
 
+    /** What the last sync did, for the Settings row. */
+    data class Status(val checking: Boolean = false, val found: Boolean? = null, val at: Long? = null, val failed: Boolean = false)
+
+    private val _status = kotlinx.coroutines.flow.MutableStateFlow(Status())
+    val status: kotlinx.coroutines.flow.StateFlow<Status> = _status
+
+    /** Read the TVs' settings again now (the Settings row). */
+    fun syncNow() = sync("manual")
+
     private const val TAG = "TotalEclipse/Household"
 
     // Written by the TVs (HomeTV ICloudSettingsSyncManager.swift).
@@ -113,31 +122,38 @@ internal object HouseholdSync {
     private fun sync(reason: String) {
         scope.launch {
             mutex.withLock {
+                _status.value = _status.value.copy(checking = true)
+                val now = { kotlin.time.Clock.System.now().toEpochMilliseconds() }
                 try {
-                    syncNow(reason)
+                    val found = syncNow(reason)
+                    _status.value = Status(found = found, at = now())
                 } catch (e: CancellationException) {
+                    _status.value = _status.value.copy(checking = false)
                     throw e
                 } catch (e: Throwable) {
                     InAppLogger.warn(TAG, "sync failed ($reason): ${e::class.simpleName}")
+                    _status.value = Status(found = _status.value.found, at = now(), failed = true)
                 }
             }
         }
     }
 
-    private suspend fun syncNow(reason: String) {
+    /** Whether the TVs' household was found in iCloud. */
+    private suspend fun syncNow(reason: String): Boolean {
         upgradeHomePlaylists()
         val keys = HouseholdCloudStore.keys()
         if (keys.none { it.startsWith(TV_PROFILE_SETTINGS_PREFIX) }) {
             InAppLogger.info(TAG, "$reason: no household data in iCloud (${keys.size} keys)")
-            return
+            return false
         }
-        val auth = AuthRepository.state.value as? AuthState.Authenticated ?: return
+        val auth = AuthRepository.state.value as? AuthState.Authenticated ?: return true
         withTimeoutOrNull(10_000) { ProfileRepository.state.first { it.isLoaded } } ?: run {
             InAppLogger.info(TAG, "$reason: profiles not loaded yet")
-            return
+            return true
         }
         val profileMap = if (auth.isAnonymous) applyProfiles() else loadProfileMap()
         applyActiveProfile(profileMap, reason)
+        return true
     }
 
     /** TV profile id → phone profile slot. Adds or renames phone profiles to match the TVs. */
@@ -446,6 +462,7 @@ internal object HouseholdSync {
                 markApplied("player.reuseLastLink.$slot", reuse.toString())
             }
         }
+        applyLanguages(slot, tvId)
         val wanted = buildMap {
             skip.keys.forEach { key -> tv[key]?.let { put(key, it) } }
             tv["nuvio.tv.settings.playback.autoPlayNext"]?.let { put("autoPlayNext", it) }
@@ -461,6 +478,56 @@ internal object HouseholdSync {
         wanted["recommendations"]?.let(player::setMovieRecommendationsEnabled)
         markApplied("player.$slot", fingerprintSource)
         InAppLogger.info(TAG, "$reason: profile $slot ← TV '$tvId' player switches (${wanted.size})")
+    }
+
+    /**
+     * Total Eclipse: the TVs' audio and subtitle languages. The TVs keep names ("English"),
+     * "System" (follow the device) and, for audio, "Original"; subtitles are an ordered list
+     * where "None" means off.
+     */
+    private fun applyLanguages(slot: Int, tvId: String) {
+        val tv = HouseholdCloudStore.stringSettings(TV_GLOBAL_SETTINGS_KEY) +
+            HouseholdCloudStore.stringSettings(TV_PROFILE_SETTINGS_PREFIX + tvId)
+        val audio = tv["nuvio.tv.settings.playback.audioLanguage"]?.let { name ->
+            when (name) {
+                "System" -> com.nuvio.app.features.player.AudioLanguageOption.DEVICE
+                "Original" -> com.nuvio.app.features.player.AudioLanguageOption.ORIGINAL
+                else -> TV_LANGUAGE_CODES[name]
+            }
+        }
+        val subtitleNames = tv["nuvio.tv.settings.playback.subtitleLanguages"]
+            ?.let { runCatching { kotlinx.serialization.json.Json.decodeFromString<List<String>>(it) }.getOrNull() }
+            ?.takeIf { it.isNotEmpty() }
+            ?: listOfNotNull(
+                tv["nuvio.tv.settings.playback.subtitleLanguage"],
+                tv["nuvio.tv.settings.playback.subtitleLanguage.secondary"],
+            ).takeIf { it.isNotEmpty() }
+        val subtitles = subtitleNames?.map { name ->
+            when (name) {
+                "System" -> com.nuvio.app.features.player.SubtitleLanguageOption.DEVICE
+                "None" -> com.nuvio.app.features.player.SubtitleLanguageOption.NONE
+                else -> TV_LANGUAGE_CODES[name]
+            }
+        }
+        val player = com.nuvio.app.features.player.PlayerSettingsRepository
+        if (audio != null && changedSinceLastApply("player.audioLanguage.$slot", audio)) {
+            player.ensureLoaded()
+            player.setPreferredAudioLanguage(audio)
+            markApplied("player.audioLanguage.$slot", audio)
+        }
+        val primary = subtitles?.firstOrNull()
+        if (primary != null) {
+            val secondary = subtitles.drop(1).firstOrNull {
+                it != null && it != com.nuvio.app.features.player.SubtitleLanguageOption.NONE && it != primary
+            }
+            val value = "$primary|${secondary.orEmpty()}"
+            if (changedSinceLastApply("player.subtitleLanguage.$slot", value)) {
+                player.ensureLoaded()
+                player.setPreferredSubtitleLanguage(primary)
+                player.setSecondaryPreferredSubtitleLanguage(secondary)
+                markApplied("player.subtitleLanguage.$slot", value)
+            }
+        }
     }
 
     private fun changedSinceLastApply(name: String, value: String): Boolean =
@@ -479,3 +546,13 @@ internal object HouseholdSync {
     private fun saveProfileMap(map: Map<String, Int>) =
         HouseholdCloudStore.saveLocal(LOCAL_PROFILE_MAP, json.encodeToString(map))
 }
+
+/** The TVs' language names (HomeTV SubtitleLanguagePreferences) → the phone's codes. */
+private val TV_LANGUAGE_CODES = mapOf(
+    "English" to "en", "Arabic" to "ar", "Bulgarian" to "bg", "Chinese" to "zh", "Croatian" to "hr",
+    "Czech" to "cs", "Danish" to "da", "Dutch" to "nl", "Finnish" to "fi", "French" to "fr",
+    "German" to "de", "Greek" to "el", "Hebrew" to "he", "Hindi" to "hi", "Hungarian" to "hu",
+    "Indonesian" to "id", "Italian" to "it", "Japanese" to "ja", "Korean" to "ko", "Norwegian" to "no",
+    "Polish" to "pl", "Portuguese" to "pt", "Romanian" to "ro", "Russian" to "ru", "Spanish" to "es",
+    "Swedish" to "sv", "Thai" to "th", "Turkish" to "tr", "Ukrainian" to "uk", "Vietnamese" to "vi",
+)
