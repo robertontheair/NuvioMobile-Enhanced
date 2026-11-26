@@ -106,14 +106,10 @@ internal actual fun rememberAudioOutputKey(enabled: Boolean): String? = null
 
 @Composable
 internal actual fun rememberPlatformPlayerGestureController(): PlayerGestureController? {
+    // Total Eclipse (Rob, 2026-11-25): the player no longer changes screen brightness, so it
+    // doesn't put any back when it closes either (that undid Control Center changes made while
+    // watching).
     val controller = remember { IOSPlayerGestureController() }
-
-    DisposableEffect(controller) {
-        onDispose {
-            controller.restoreBrightness()
-        }
-    }
-
     return controller
 }
 

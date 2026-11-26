@@ -97,12 +97,10 @@ internal fun Modifier.playerSurfaceDragGestures(
             val backGestureEdgePx = horizontalSeekSystemEdgeExclusionPx.coerceAtMost(width * 0.25f)
             val isInBackGestureEdge = backGestureEdgePx > 0f &&
                 (down.position.x <= backGestureEdgePx || down.position.x >= width - backGestureEdgePx)
-            val region = when {
-                isInSideGestureSystemEdge -> null
-                down.position.x < width * PlayerLeftGestureBoundary -> PlayerSideGesture.Brightness
-                down.position.x > width * PlayerRightGestureBoundary -> PlayerSideGesture.Volume
-                else -> null
-            }
+            // Total Eclipse (Rob, 2026-11-25): no brightness or volume swipes on the sides; they
+            // were too easy to set off by accident (one stray swipe left every video near-dark).
+            // Volume stays on the phone's buttons, brightness in Control Center.
+            val region: PlayerSideGesture? = null
 
             val initialBrightness = if (region == PlayerSideGesture.Brightness) {
                 controller?.currentBrightness()

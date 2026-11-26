@@ -134,9 +134,8 @@ internal fun PlayerScreenContent(args: PlayerScreenArgs) {
         runtime.gestureController = if (runtime.isMiniPresentation) {
             null
         } else {
-            rememberPlayerGestureController(
-                restoreBrightness = playerSettingsUiState.touchGesturesEnabled,
-            )
+            // Total Eclipse: never set the screen to a saved brightness when playback starts.
+            rememberPlayerGestureController(restoreBrightness = false)
         }
         runtime.playerSettingsUiState = playerSettingsUiState
         runtime.p2pSettingsUiState = p2pSettingsUiState
