@@ -156,8 +156,13 @@ internal fun liveSportsNow(
             title != "No event scheduled" && title != "Event ended" -> live += Triple(channel, now.startMillis, title)
         }
     }
+    // Total Eclipse: games with a team you follow first, live then coming up.
+    com.nuvio.app.totaleclipse.TotalEclipseSportsPrefs.load()
+    val teams = com.nuvio.app.totaleclipse.TotalEclipseSportsPrefs.teams.value
+    fun mine(t: Triple<LiveTvChannel, Long, String>) =
+        if (com.nuvio.app.totaleclipse.TotalEclipseSportsPrefs.titleMentionsFollowed(t.third, teams)) 0 else 1
     val seen = HashSet<String>()
-    return (live.sortedBy { it.second } + soon.sortedBy { it.second })
+    return (live.sortedWith(compareBy({ mine(it) }, { it.second })) + soon.sortedWith(compareBy({ mine(it) }, { it.second })))
         .filter { seen.add(it.third.lowercase()) }
         .map { it.first }
 }

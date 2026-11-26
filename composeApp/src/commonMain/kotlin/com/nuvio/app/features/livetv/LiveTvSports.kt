@@ -17,9 +17,14 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.SportsSoccer
+import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.StarBorder
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -428,6 +433,9 @@ internal fun LiveTvSportsControls(
     selectedFilter: String,
     counts: Map<String, Int>,
     onFilterSelected: (String) -> Unit,
+    hasMyTeams: Boolean = false,
+    hideScores: Boolean = false,
+    onHideScoresChange: ((Boolean) -> Unit)? = null,
 ) {
     val tokens = MaterialTheme.nuvio
     Row(
@@ -442,6 +450,15 @@ internal fun LiveTvSportsControls(
                 .horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s8),
         ) {
+            // Total Eclipse: your teams first.
+            if (hasMyTeams) {
+                LiveTvPanelFilterChip(
+                    label = "My Teams",
+                    selected = selectedFilter == LIVE_TV_SPORTS_FILTER_MINE,
+                    onClick = { onFilterSelected(LIVE_TV_SPORTS_FILTER_MINE) },
+                    count = counts[LIVE_TV_SPORTS_FILTER_MINE],
+                )
+            }
             LiveTvPanelFilterChip(
                 label = allLabel,
                 selected = selectedFilter == LIVE_TV_SPORTS_FILTER_ALL,
@@ -465,17 +482,35 @@ internal fun LiveTvSportsControls(
                 )
             }
         }
+        // Total Eclipse: Hide Scores keeps results off the screen until you want them.
+        if (onHideScoresChange != null) {
+            Icon(
+                imageVector = if (hideScores) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
+                contentDescription = if (hideScores) "Show scores" else "Hide scores",
+                tint = if (hideScores) tokens.colors.accent else tokens.colors.textMuted,
+                modifier = Modifier
+                    .padding(start = 8.dp)
+                    .clip(CircleShape)
+                    .clickable { onHideScoresChange(!hideScores) }
+                    .padding(8.dp)
+                    .size(20.dp),
+            )
+        }
     }
 }
 
 internal const val LIVE_TV_SPORTS_FILTER_ALL = "all"
 internal const val LIVE_TV_SPORTS_FILTER_LIVE = "live"
+internal const val LIVE_TV_SPORTS_FILTER_MINE = "mine"
 
 internal fun LazyListScope.liveTvSportsList(
     events: List<LiveTvSportsEvent>,
     matchedChannels: Map<String, List<LiveTvChannel>>,
     nowMillis: Long,
     onChannelClick: (LiveTvChannel) -> Unit,
+    followedTeams: Set<String> = emptySet(),
+    hideScores: Boolean = false,
+    onToggleTeam: ((LiveTvSportsLeague, String) -> Unit)? = null,
 ) {
     items(events, key = { "sports:${it.league.id}:${it.id}" }) { event ->
         LiveTvSportsEventCard(
@@ -483,6 +518,9 @@ internal fun LazyListScope.liveTvSportsList(
             channels = matchedChannels["${event.league.id}:${event.id}"].orEmpty(),
             nowMillis = nowMillis,
             onChannelClick = onChannelClick,
+            followedTeams = followedTeams,
+            hideScores = hideScores,
+            onToggleTeam = onToggleTeam,
         )
     }
 }
@@ -493,6 +531,9 @@ private fun LiveTvSportsEventCard(
     channels: List<LiveTvChannel>,
     nowMillis: Long,
     onChannelClick: (LiveTvChannel) -> Unit,
+    followedTeams: Set<String> = emptySet(),
+    hideScores: Boolean = false,
+    onToggleTeam: ((LiveTvSportsLeague, String) -> Unit)? = null,
 ) {
     val tokens = MaterialTheme.nuvio
     Surface(
@@ -515,15 +556,18 @@ private fun LiveTvSportsEventCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                LiveTvSportsStatus(event = event, nowMillis = nowMillis)
+                LiveTvSportsStatus(event = event, nowMillis = nowMillis, hideScores = hideScores)
             }
             if (event.competitors.size >= 2) {
                 event.competitors.forEach { competitor ->
                     LiveTvSportsCompetitorRow(
                         competitor = competitor,
-                        showScore = event.state != LiveTvSportsState.Upcoming,
-                        dimmed = event.state == LiveTvSportsState.Finished &&
+                        showScore = event.state != LiveTvSportsState.Upcoming && !hideScores,
+                        dimmed = !hideScores && event.state == LiveTvSportsState.Finished &&
                             event.competitors.any { it.isWinner } && !competitor.isWinner,
+                        showWinner = !hideScores,
+                        followed = com.nuvio.app.totaleclipse.TotalEclipseSportsPrefs.key(event.league.id, competitor.name) in followedTeams,
+                        onToggleFollow = onToggleTeam?.let { toggle -> { toggle(event.league, competitor.name) } },
                     )
                 }
             } else {
@@ -566,7 +610,7 @@ private fun LiveTvSportsEventCard(
 }
 
 @Composable
-private fun LiveTvSportsStatus(event: LiveTvSportsEvent, nowMillis: Long) {
+private fun LiveTvSportsStatus(event: LiveTvSportsEvent, nowMillis: Long, hideScores: Boolean = false) {
     val tokens = MaterialTheme.nuvio
     when (event.state) {
         LiveTvSportsState.Live -> Row(
@@ -583,7 +627,7 @@ private fun LiveTvSportsStatus(event: LiveTvSportsEvent, nowMillis: Long) {
                     .background(Color(0xFFE53935))
                     .padding(horizontal = 6.dp, vertical = 2.dp),
             )
-            if (event.statusDetail.isNotBlank()) {
+            if (event.statusDetail.isNotBlank() && !hideScores) {
                 Text(
                     text = event.statusDetail,
                     style = MaterialTheme.typography.labelMedium,
@@ -601,7 +645,8 @@ private fun LiveTvSportsStatus(event: LiveTvSportsEvent, nowMillis: Long) {
         )
 
         LiveTvSportsState.Finished -> Text(
-            text = event.statusDetail.ifBlank { formatSportsStart(event.startMillis, nowMillis) },
+            // Total Eclipse: with Hide Scores, just "Final" (some statuses carry the result).
+            text = if (hideScores) "Final" else event.statusDetail.ifBlank { formatSportsStart(event.startMillis, nowMillis) },
             style = MaterialTheme.typography.labelMedium,
             color = tokens.colors.textMuted,
         )
@@ -625,6 +670,9 @@ private fun LiveTvSportsCompetitorRow(
     competitor: LiveTvSportsCompetitor,
     showScore: Boolean,
     dimmed: Boolean,
+    showWinner: Boolean = true,
+    followed: Boolean = false,
+    onToggleFollow: (() -> Unit)? = null,
 ) {
     val tokens = MaterialTheme.nuvio
     val textColor = if (dimmed) tokens.colors.textMuted else tokens.colors.textPrimary
@@ -656,7 +704,7 @@ private fun LiveTvSportsCompetitorRow(
             text = competitor.name,
             style = MaterialTheme.typography.titleSmall,
             color = textColor,
-            fontWeight = if (competitor.isWinner) FontWeight.Bold else FontWeight.Medium,
+            fontWeight = if (competitor.isWinner && showWinner) FontWeight.Bold else FontWeight.Medium,
             modifier = Modifier.weight(1f),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -667,6 +715,19 @@ private fun LiveTvSportsCompetitorRow(
                 style = MaterialTheme.typography.titleMedium,
                 color = textColor,
                 fontWeight = FontWeight.Bold,
+            )
+        }
+        // Total Eclipse: follow a team with its star.
+        if (onToggleFollow != null) {
+            Icon(
+                imageVector = if (followed) Icons.Rounded.Star else Icons.Rounded.StarBorder,
+                contentDescription = if (followed) "Unfollow ${competitor.name}" else "Follow ${competitor.name}",
+                tint = if (followed) Color(0xFFFFC107) else tokens.colors.textMuted.copy(alpha = 0.6f),
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .clickable(onClick = onToggleFollow)
+                    .padding(4.dp)
+                    .size(20.dp),
             )
         }
     }

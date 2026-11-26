@@ -425,25 +425,35 @@ fun LiveTvScreen(
         val present = sportsState.events.map { it.league.id }.toSet()
         liveTvSportsLeagues.filter { it.id in present }
     }
-    val sportsChipCounts = remember(sportsState.events) {
+    // Total Eclipse: followed teams and Hide Scores, per profile.
+    LaunchedEffect(Unit) { com.nuvio.app.totaleclipse.TotalEclipseSportsPrefs.load() }
+    val followedTeams by com.nuvio.app.totaleclipse.TotalEclipseSportsPrefs.teams.collectAsStateWithLifecycle()
+    val hideScores by com.nuvio.app.totaleclipse.TotalEclipseSportsPrefs.hideScores.collectAsStateWithLifecycle()
+    val myTeamCount = remember(sportsState.events, followedTeams) {
+        sportsState.events.count { com.nuvio.app.totaleclipse.TotalEclipseSportsPrefs.involvesFollowed(it, followedTeams) }
+    }
+    val sportsChipCounts = remember(sportsState.events, myTeamCount) {
         buildMap {
+            put(LIVE_TV_SPORTS_FILTER_MINE, myTeamCount)
             put(LIVE_TV_SPORTS_FILTER_ALL, sportsState.events.size)
             put(LIVE_TV_SPORTS_FILTER_LIVE, sportsState.events.count { it.state == LiveTvSportsState.Live })
             sportsState.events.groupingBy { it.league.id }.eachCount().forEach { (id, count) -> put(id, count) }
         }
     }
     val hasLiveSports = sportsState.events.any { it.state == LiveTvSportsState.Live }
-    val visibleSports = remember(sportsState.events, sportsFilter) {
+    val visibleSports = remember(sportsState.events, sportsFilter, followedTeams) {
         sportsState.events.filter { event ->
             when (sportsFilter) {
                 LIVE_TV_SPORTS_FILTER_ALL -> true
                 LIVE_TV_SPORTS_FILTER_LIVE -> event.state == LiveTvSportsState.Live
+                LIVE_TV_SPORTS_FILTER_MINE -> com.nuvio.app.totaleclipse.TotalEclipseSportsPrefs.involvesFollowed(event, followedTeams)
                 else -> event.league.id == sportsFilter
             }
-        }
+        }.sortedBy { if (com.nuvio.app.totaleclipse.TotalEclipseSportsPrefs.involvesFollowed(it, followedTeams)) 0 else 1 }
     }
-    LaunchedEffect(sportsLeagues, hasLiveSports, sportsFilter) {
+    LaunchedEffect(sportsLeagues, hasLiveSports, sportsFilter, myTeamCount) {
         val valid = sportsFilter == LIVE_TV_SPORTS_FILTER_ALL ||
+            (sportsFilter == LIVE_TV_SPORTS_FILTER_MINE && myTeamCount > 0) ||
             (sportsFilter == LIVE_TV_SPORTS_FILTER_LIVE && hasLiveSports) ||
             sportsLeagues.any { it.id == sportsFilter }
         if (!valid && sportsState.hasLoaded) sportsFilter = LIVE_TV_SPORTS_FILTER_ALL
@@ -661,13 +671,16 @@ fun LiveTvScreen(
                     }
                     if (section == LiveTvSection.Sports && sportsState.events.isNotEmpty()) {
                         LiveTvSportsControls(
-                            allLabel = allChannelsLabel,
+                            allLabel = "All Games", // Total Eclipse: games, not channels
                             liveLabel = stringResource(Res.string.live_tv_sports_filter_live),
                             leagues = sportsLeagues,
                             hasLive = hasLiveSports,
                             selectedFilter = sportsFilter,
                             counts = sportsChipCounts,
                             onFilterSelected = { sportsFilter = it },
+                            hasMyTeams = myTeamCount > 0,
+                            hideScores = hideScores,
+                            onHideScoresChange = com.nuvio.app.totaleclipse.TotalEclipseSportsPrefs::setHideScores,
                         )
                     }
                     if (section == LiveTvSection.OnDemand && hasVodProvider) {
@@ -754,6 +767,11 @@ fun LiveTvScreen(
                         matchedChannels = sportsMatches,
                         nowMillis = epgNowMillis,
                         onChannelClick = playChannel,
+                        followedTeams = followedTeams,
+                        hideScores = hideScores,
+                        onToggleTeam = { league, team ->
+                            com.nuvio.app.totaleclipse.TotalEclipseSportsPrefs.toggleTeam(league.id, team)
+                        },
                     )
                 }
             } else if (uiState.hasPlaylist && section == LiveTvSection.OnDemand) {
