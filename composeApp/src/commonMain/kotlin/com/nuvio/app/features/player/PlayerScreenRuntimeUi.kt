@@ -824,11 +824,24 @@ private fun PlayerScreenRuntime.RenderPlayerControls(
         // Total Eclipse: live TV pause and rewind. "LIVE" at the live edge; behind it, how far
         // and a Back to Live button.
         if (isLiveTvPlayback) {
+            val multiviewAvailable = com.nuvio.app.totaleclipse.totalEclipseMultiviewAvailable()
             TotalEclipseLiveEdgePill(
                 secondsBehind = liveSecondsBehind,
                 onBackToLive = {
                     playerController?.jumpToLive()
                     controlsActivityTick += 1
+                },
+                onMultiview = if (multiviewAvailable && !isPartyControlLocked) {
+                    {
+                        val channel = com.nuvio.app.features.livetv.LiveTvRepository.uiState.value.channels
+                            .firstOrNull { it.id == activeVideoId }
+                        if (channel != null) {
+                            args.onBack()
+                            com.nuvio.app.totaleclipse.TotalEclipseMultiview.open(listOf(channel))
+                        }
+                    }
+                } else {
+                    null
                 },
             )
         }

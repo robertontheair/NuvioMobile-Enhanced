@@ -101,6 +101,20 @@ internal fun PlayerScreenRuntime.BindTotalEclipsePlaybackGuards() {
         args.onBack()
     }
 
+    // Total Eclipse: a film in a collection lands on the next film's page, as on the Apple TVs.
+    LaunchedEffect(activePlaybackKey, playbackSnapshot.isEnded) {
+        if (!playbackSnapshot.isEnded || isLiveTvPlayback || !isMoviePlayback) return@LaunchedEffect
+        val next = com.nuvio.app.totaleclipse.TotalEclipseNextFilm.after(playerMeta) ?: return@LaunchedEffect
+        delay(FILM_END_DELAY_MS)
+        val busy = showUserRatingSheet || totalEclipseRatingDue || showSourcesPanel ||
+            errorMessage != null || isPartyControlLocked
+        if (!playbackSnapshot.isEnded || busy) return@LaunchedEffect
+        InAppLogger.info(TAG, "film ended; on to the next in its collection")
+        flushWatchProgress()
+        args.onBack()
+        com.nuvio.app.totaleclipse.TotalEclipseNextFilm.request(next)
+    }
+
     // A rating, once per title, when the credits of a movie or a season's last episode start.
     val ratingOn by com.nuvio.app.totaleclipse.TotalEclipsePlayerPrefs.ratingPrompt.collectAsState()
     LaunchedEffect(activePlaybackKey, ratingOn, isLiveTvPlayback) {
@@ -135,6 +149,9 @@ internal fun PlayerScreenRuntime.BindTotalEclipsePlaybackGuards() {
 }
 
 private const val END_RETURN_DELAY_MS = 5_000L
+
+/** Films wait longer: the recommendations card may be showing. */
+private const val FILM_END_DELAY_MS = 10_000L
 
 /** Titles (and seasons) already offered a rating since the app started. */
 private val ratingOffered = mutableSetOf<String>()

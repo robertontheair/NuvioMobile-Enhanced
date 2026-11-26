@@ -127,6 +127,7 @@ internal fun LazyListScope.totalEclipseHistoryContent(
                 Text(
                     text = item.name,
                     style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onBackground,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,

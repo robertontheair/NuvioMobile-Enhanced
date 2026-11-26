@@ -32,13 +32,18 @@ internal const val TOTAL_ECLIPSE_LIVE_EDGE_SECONDS = 15.0
 internal fun TotalEclipseLiveEdgePill(
     secondsBehind: Double?,
     onBackToLive: () -> Unit,
+    onMultiview: (() -> Unit)? = null,
 ) {
     Box(modifier = Modifier.fillMaxSize().statusBarsPadding(), contentAlignment = Alignment.TopCenter) {
         val behind = secondsBehind ?: 0.0
         val atLive = behind < TOTAL_ECLIPSE_LIVE_EDGE_SECONDS
         Row(
+            modifier = Modifier.padding(top = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+        Row(
             modifier = Modifier
-                .padding(top = 16.dp)
                 .clip(RoundedCornerShape(99.dp))
                 .background(Color.Black.copy(alpha = 0.55f))
                 .then(if (atLive) Modifier else Modifier.clickable(onClick = onBackToLive))
@@ -59,6 +64,22 @@ internal fun TotalEclipseLiveEdgePill(
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
             )
+        }
+        // Total Eclipse: Multiview from the player — this channel becomes the first pane.
+        if (onMultiview != null) {
+            Text(
+                text = "Multiview",
+                color = Color.White,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(99.dp))
+                    .background(Color.Black.copy(alpha = 0.55f))
+                    .clickable(onClick = onMultiview)
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+            )
+        }
         }
     }
 }

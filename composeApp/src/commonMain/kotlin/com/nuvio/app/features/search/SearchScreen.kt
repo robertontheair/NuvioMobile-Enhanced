@@ -1,5 +1,6 @@
 package com.nuvio.app.features.search
 
+import kotlinx.datetime.toLocalDateTime
 import androidx.compose.ui.graphics.Color
 import com.nuvio.app.core.ui.background.appBackgroundCover
 import androidx.compose.foundation.clickable
@@ -142,6 +143,15 @@ fun SearchScreen(
         HomeCatalogSettingsRepository.uiState
     }.collectAsStateWithLifecycle()
     val recentSearches by SearchHistoryRepository.uiState.collectAsStateWithLifecycle()
+    // Total Eclipse: the Apple TVs' Explore tiles (seasonal ones by today's date).
+    val exploreState by TotalEclipseExplore.state.collectAsStateWithLifecycle()
+    val exploreTiles = remember {
+        val zone = kotlinx.datetime.TimeZone.currentSystemDefault()
+        val now = kotlin.time.Clock.System.now()
+        val today = now.toLocalDateTime(zone).date
+        val recent = (now - kotlin.time.Duration.parse("150d")).toLocalDateTime(zone).date
+        totalEclipseExploreTiles(today.toString(), recent.toString())
+    }
     val watchedUiState by WatchedRepository.uiState.collectAsStateWithLifecycle()
     val fullyWatchedSeriesKeys by WatchedRepository.fullyWatchedSeriesKeys.collectAsStateWithLifecycle()
     val networkStatusUiState by NetworkStatusRepository.uiState.collectAsStateWithLifecycle()
@@ -326,7 +336,7 @@ fun SearchScreen(
                     androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(14.dp))
                     }
                     }
-                    if (query.isBlank()) {
+                    if (query.isBlank() && exploreState.tile == null) {
                         DiscoverFilterRow(
                             state = discoverUiState,
                             modifier = Modifier
@@ -347,7 +357,17 @@ fun SearchScreen(
                 autoHidesNativeTabBar = true,
                 modifier = Modifier.weight(1f),
             ) {
-                if (query.isBlank()) {
+                if (query.isBlank() && exploreState.tile != null) {
+                    // Total Eclipse: an Explore tile, open in place of Discover.
+                    totalEclipseExploreContent(
+                        state = exploreState,
+                        columns = discoverColumns,
+                        watchedKeys = watchedUiState.watchedKeys,
+                        fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
+                        onPosterClick = onPosterClick,
+                        onPosterLongClick = onPosterLongClick,
+                    )
+                } else if (query.isBlank()) {
                     // Total Eclipse: recent searches always show while the field is empty (not only
                     // while it has focus), newest 8, with Clear All — as on the Apple TVs.
                     if (recentSearches.isNotEmpty()) {
@@ -358,6 +378,9 @@ fun SearchScreen(
                                 onRemoveSearch = SearchHistoryRepository::removeSearch,
                             )
                         }
+                    }
+                    item(key = "te_explore_tiles") {
+                        TotalEclipseExploreRow(tiles = exploreTiles, onOpen = TotalEclipseExplore::open)
                     }
                     discoverContent(
                         state = discoverUiState,

@@ -1567,6 +1567,17 @@ internal fun MainAppContent(
             }
         }
 
+        // Total Eclipse: a film ended; open the next one in its collection.
+        LaunchedEffect(Unit) {
+            if (!ownsAppRuntime) return@LaunchedEffect
+            com.nuvio.app.totaleclipse.TotalEclipseNextFilm.open.collect { film ->
+                if (film != null) {
+                    com.nuvio.app.totaleclipse.TotalEclipseNextFilm.consume()
+                    navController.navigate(DetailRoute(type = film.type, id = film.id, title = film.name))
+                }
+            }
+        }
+
         // Total Eclipse: channel up/down / Last Channel from the live player.
         LaunchedEffect(Unit) {
             if (!ownsAppRuntime) return@LaunchedEffect
