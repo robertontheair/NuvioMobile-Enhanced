@@ -877,6 +877,15 @@ private fun BoxScope.RenderPlaybackOverlays(
                 activeStreamTitle.ifBlank { title }, raw, activeSourceUrl, activeSourceHeaders,
             )
         }
+        // Total Eclipse: films and episodes get the Apple TVs' plain wording and Other Sources.
+        val networkUiState by com.nuvio.app.core.network.NetworkStatusRepository.uiState.collectAsStateWithLifecycle()
+        val plainError = errorMessage?.takeIf { !isLiveTvPlayback }?.let { raw ->
+            com.nuvio.app.totaleclipse.TotalEclipsePlainError.text(
+                raw = raw,
+                offline = networkUiState.condition == com.nuvio.app.core.network.NetworkCondition.NoInternet,
+                hasOtherSources = activeVideoId != null,
+            )
+        }
         PlayerPlaybackOverlays(
             playerControlsLocked = playerControlsLocked,
             useLegacyLayout = playerSettingsUiState.useLegacyPlayerLayout,
@@ -981,7 +990,14 @@ private fun BoxScope.RenderPlaybackOverlays(
             )
             showMovieRecommendationCard = false
         },
-        errorMessage = liveErrorMessage,
+        errorMessage = plainError?.message ?: liveErrorMessage,
+            errorTitle = plainError?.title ?: if (isLiveTvPlayback) "Can't play this channel" else null,
+            onOtherSourcesError = if (!isLiveTvPlayback && activeVideoId != null) {
+                {
+                    errorMessage = null
+                    openSourcesPanel()
+                }
+            } else null,
             onRetryError = if (isLiveTvPlayback) {
                 {
                     errorMessage = null

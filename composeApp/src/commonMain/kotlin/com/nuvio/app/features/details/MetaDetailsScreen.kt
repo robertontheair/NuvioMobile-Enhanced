@@ -696,6 +696,20 @@ fun MetaDetailsScreen(
                 val seriesPauseDescription = remember(seriesActionVideo) {
                     seriesActionVideo?.overview
                 }
+                // Total Eclipse: as on the Apple TVs, a show you're partway through leads with your
+                // episode ("S2 E5 · Title" and its synopsis) instead of the show's description.
+                val leadMeta = remember(meta, seriesAction, seriesActionVideo) {
+                    val video = seriesActionVideo
+                    val label = seriesAction?.label.orEmpty()
+                    if (video == null || video.season == null || video.episode == null || label.startsWith("Play")) {
+                        meta
+                    } else {
+                        val title = video.title.trim()
+                        val head = "S${video.season} E${video.episode}" + if (title.isEmpty()) "" else " · $title"
+                        val body = video.overview?.trim()?.takeIf { it.isNotEmpty() } ?: meta.description
+                        meta.copy(description = listOfNotNull(head, body).joinToString("\n"))
+                    }
+                }
                 val seriesStreamVideoId = remember(seriesAction, seriesActionVideo) {
                     val action = seriesAction ?: return@remember null
                     seriesActionVideo?.id?.takeIf { it.isNotBlank() } ?: action.videoId
@@ -1277,7 +1291,7 @@ fun MetaDetailsScreen(
                                     item(key = "detail-hero") {
                                         if (useTabletLayout) {
                                             TabletDetailHero(
-                                                meta = meta,
+                                                meta = leadMeta,
                                                 showOverview = isSectionEnabled(MetaScreenSectionKey.OVERVIEW),
                                                 showOverallRatings = metaScreenSettingsUiState.showOverallRatings,
                                                 isMdbListActive = mdbListSettings.isActive,
@@ -1347,7 +1361,7 @@ fun MetaDetailsScreen(
                                             metaScreenSettingsUiState
                                         },
                                         isMdbListActive = mdbListSettings.isActive,
-                                        meta = meta,
+                                        meta = leadMeta,
                                         isTablet = isTablet,
                                         contentHorizontalPadding = contentHorizontalPadding,
                                         contentMaxWidth = if (isTablet && !useTabletLayout) contentMaxWidth else Dp.Unspecified,

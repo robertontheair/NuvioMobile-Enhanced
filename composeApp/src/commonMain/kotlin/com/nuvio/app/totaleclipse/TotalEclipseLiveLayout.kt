@@ -10,8 +10,8 @@ import kotlinx.serialization.json.Json
  * categories with the channels moved into them, and hidden channels. A profile with no layout of
  * its own uses the primary profile's, as on the TVs.
  *
- * On the phone a channel has one category: a channel moved into one of your categories shows
- * there (the first, if several); one only added (not moved) stays in its own category.
+ * A channel moved into one of your categories takes it as its category (the first, if several);
+ * one only added also shows in your category ([customMembers]) and stays in its own.
  */
 internal object TotalEclipseLiveLayout {
     const val TV_KEY = "hometv.iptv.layout.v1"
@@ -38,6 +38,42 @@ internal object TotalEclipseLiveLayout {
     @kotlin.concurrent.Volatile var categoryKeyByChannel: Map<String, String> = emptyMap()
         private set
 
+    /**
+     * Your categories by name → their channels in your order, moved or only added
+     * (as on the TVs, a channel can be in your category and still in its own).
+     */
+    @kotlin.concurrent.Volatile var customMembers: Map<String, List<String>> = emptyMap()
+        private set
+
+    fun membersOf(category: String?): List<String>? =
+        category?.let { name -> customMembers.entries.firstOrNull { it.key.equals(name, ignoreCase = true) }?.value }
+
+    /** Where the TVs open Live TV ("Open Live TV Here"). */
+    sealed interface Start {
+        data object Recents : Start
+        data object Favorites : Start
+        data object All : Start
+        data class Category(val title: String) : Start
+    }
+
+    fun start(): Start? {
+        val layout = layout ?: return null
+        val key = layout.start?.takeIf(String::isNotBlank) ?: return null
+        return when {
+            key == "\u0001recent" -> Start.Recents
+            key == "\u0001favorites" -> Start.Favorites
+            key == "\u0001all" -> Start.All
+            key.startsWith(CUSTOM_PREFIX) ->
+                layout.custom.firstOrNull { CUSTOM_PREFIX + it.id == key }?.name?.let(Start::Category)
+            key.startsWith("\u0001") -> null
+            else -> (layout.names[key]?.takeIf(String::isNotBlank)
+                ?: categoryKeyByChannel.entries.firstOrNull { it.value == key }?.let { groupTitles[it.key] })
+                ?.let(Start::Category)
+        }
+    }
+
+    @kotlin.concurrent.Volatile private var groupTitles: Map<String, String> = emptyMap()
+
     /** Returns true when the layout changed. */
     fun update(text: String?): Boolean {
         if (text == layoutText) return false
@@ -51,8 +87,13 @@ internal object TotalEclipseLiveLayout {
     /** The channels as the TVs arrange them. */
     fun apply(channels: List<LiveTvChannel>): List<LiveTvChannel> {
         categoryKeyByChannel = channels.associate { it.id to TotalEclipseLiveGroups.tvKey(it.group.orEmpty()) }
-        val layout = layout ?: run { orderedTitles = emptyMap(); return channels }
+        groupTitles = channels.associate { it.id to it.group.orEmpty() }
+        val layout = layout ?: run { orderedTitles = emptyMap(); customMembers = emptyMap(); return channels }
         val hidden = layout.hiddenChannels.toSet()
+        val ids = channels.mapTo(HashSet()) { it.id }
+        customMembers = layout.custom.associate { c ->
+            c.name to c.channels.filter { it in ids && it !in hidden }.distinct()
+        }.filterValues { it.isNotEmpty() }
         val moved = layout.moved.toSet()
         val customOf = HashMap<String, Custom>()
         layout.custom.forEach { c -> c.channels.forEach { ch -> customOf.getOrPut(ch) { c } } }

@@ -295,6 +295,8 @@ internal fun ErrorModal(
     message: String,
     onDismiss: () -> Unit,
     onRetry: (() -> Unit)? = null,
+    title: String? = null,
+    onOtherSources: (() -> Unit)? = null,
 ) {
     Box(
         modifier = Modifier
@@ -310,7 +312,7 @@ internal fun ErrorModal(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(
-                text = stringResource(Res.string.compose_player_playback_error),
+                text = title ?: stringResource(Res.string.compose_player_playback_error),
                 style = MaterialTheme.nuvioTypeScale.displaySm.copy(fontWeight = FontWeight.Bold),
                 color = Color.White,
                 textAlign = TextAlign.Center,
@@ -323,6 +325,27 @@ internal fun ErrorModal(
                 maxLines = 4,
                 overflow = TextOverflow.Ellipsis,
             )
+            if (onOtherSources != null) {
+                // Total Eclipse: Other Sources first, as on the Apple TVs.
+                Surface(
+                    modifier = Modifier
+                        .padding(top = 4.dp)
+                        .widthIn(min = 180.dp, max = 260.dp)
+                        .clickable(onClick = onOtherSources),
+                    color = Color.White,
+                    shape = RoundedCornerShape(12.dp),
+                ) {
+                    Text(
+                        text = "Other Sources",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 12.dp),
+                        style = MaterialTheme.nuvioTypeScale.bodyLg.copy(fontWeight = FontWeight.Bold),
+                        color = Color.Black,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            }
             if (onRetry != null) {
                 // Total Eclipse: Try Again (Live TV), as on the Apple TVs.
                 Surface(

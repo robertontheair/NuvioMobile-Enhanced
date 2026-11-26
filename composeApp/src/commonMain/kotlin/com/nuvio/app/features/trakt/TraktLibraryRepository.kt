@@ -537,12 +537,19 @@ object TraktLibraryRepository {
     }
 
     private suspend fun fetchWatchlistItems(headers: Map<String, String>): List<LibraryItem> {
+        // Total Eclipse: the order you chose on trakt.tv comes back as X-Sort-By / X-Sort-How.
+        var sortBy: String? = null
+        var sortHow: String? = null
         val (movieItems, showItems) = coroutineScope {
             val moviesDeferred = async {
                 fetchPagedListItems(
                     headers = headers,
                     urlForPage = { page ->
                         "$BASE_URL/users/me/watchlist/movies/rank?extended=full,images&page=$page&limit=$TRAKT_PAGE_LIMIT"
+                    },
+                    onFirstPage = { response ->
+                        sortBy = response.headerText("x-sort-by")
+                        sortHow = response.headerText("x-sort-how")
                     },
                 )
             }
@@ -556,9 +563,26 @@ object TraktLibraryRepository {
             }
             moviesDeferred.await() to showsDeferred.await()
         }
-        return (movieItems + showItems)
-            .mapNotNull(::mapToLibraryItem)
-            .sortedByDescending { it.savedAtEpochMs }
+        // Total Eclipse: as on the Apple TVs (HomeTVWatchlistSort), the Library's default order
+        // follows trakt.tv's; each item's rank becomes its place in that order.
+        val all = movieItems + showItems
+        val order = com.nuvio.app.totaleclipse.TotalEclipseWatchlistSort.order(
+            entries = all.map { item ->
+                val media = item.movie ?: item.show
+                com.nuvio.app.totaleclipse.TotalEclipseWatchlistSort.Entry(
+                    rank = item.rank,
+                    listedAt = item.listedAt,
+                    title = media?.title.orEmpty(),
+                    year = media?.year,
+                    rating = media?.rating,
+                )
+            },
+            sortBy = sortBy,
+            sortHow = sortHow,
+        )
+        return order.mapIndexedNotNull { position, index ->
+            mapToLibraryItem(all[index])?.copy(traktRank = position + 1)
+        }
     }
 
     /** Total Eclipse: /sync/favorites, movies and shows, newest first (same shape as the watchlist). */
@@ -620,12 +644,14 @@ object TraktLibraryRepository {
     private suspend fun fetchPagedListItems(
         headers: Map<String, String>,
         urlForPage: (Int) -> String,
+        onFirstPage: ((RawHttpResponse) -> Unit)? = null,
     ): List<TraktListItemDto> {
         val items = mutableListOf<TraktListItemDto>()
         var page = 1
 
         while (true) {
             val response = getJsonResponse(headers = headers, url = urlForPage(page))
+            if (page == 1) onFirstPage?.invoke(response)
             val pageItems = json.decodeFromString<List<TraktListItemDto>>(response.body)
             items.addAll(pageItems)
 
@@ -680,6 +706,12 @@ object TraktLibraryRepository {
         }
         return response
     }
+
+    private fun RawHttpResponse.headerText(name: String): String? =
+        headers.entries.firstOrNull { (key, _) -> key.equals(name, ignoreCase = true) }
+            ?.value
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
 
     private fun RawHttpResponse.headerInt(name: String): Int? =
         headers.entries.firstOrNull { (key, _) -> key.equals(name, ignoreCase = true) }

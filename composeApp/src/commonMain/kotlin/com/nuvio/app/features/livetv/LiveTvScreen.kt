@@ -288,7 +288,18 @@ fun LiveTvScreen(
         if (openedForProfile == liveProfile || uiState.channels.isEmpty()) return@LaunchedEffect
         openedForProfile = liveProfile
         onNowFilterName = null
+        // Total Eclipse: "Open Live TV Here" on the TVs wins when that category is here.
+        val start = com.nuvio.app.totaleclipse.TotalEclipseLiveLayout.start()
+        val startCategory = (start as? com.nuvio.app.totaleclipse.TotalEclipseLiveLayout.Start.Category)?.title
+            ?.let { title -> categoryChips.firstOrNull { it.equals(title, ignoreCase = true) } }
         when {
+            startCategory != null -> {
+                selectedCategoryName = startCategory
+                filterMode = LiveTvChannelFilterMode.Category
+            }
+            start == com.nuvio.app.totaleclipse.TotalEclipseLiveLayout.Start.Recents && hasRecents -> filterMode = LiveTvChannelFilterMode.Recents
+            start == com.nuvio.app.totaleclipse.TotalEclipseLiveLayout.Start.Favorites && hasFavorites -> filterMode = LiveTvChannelFilterMode.Favorites
+            start == com.nuvio.app.totaleclipse.TotalEclipseLiveLayout.Start.All -> filterMode = LiveTvChannelFilterMode.All
             hasRecents -> filterMode = LiveTvChannelFilterMode.Recents
             hasFavorites -> filterMode = LiveTvChannelFilterMode.Favorites
             categoryChips.isNotEmpty() -> {
@@ -333,7 +344,17 @@ fun LiveTvScreen(
             favorites = searched.count { it.id in uiState.favoriteChannelIds },
             categories = searched
                 .groupingBy { categoryNameForChannel(it, uncategorizedLabel).lowercase() }
-                .eachCount(),
+                .eachCount()
+                .toMutableMap()
+                .also { counts ->
+                    // Total Eclipse: your categories count channels only added to them too.
+                    val searchedIds = searched.mapTo(HashSet()) { it.id }
+                    com.nuvio.app.totaleclipse.TotalEclipseLiveLayout.customMembers.forEach { (name, ids) ->
+                        val inOwn = searched.filter { categoryNameForChannel(it, uncategorizedLabel).equals(name, ignoreCase = true) }
+                            .mapTo(HashSet()) { it.id }
+                        counts[name.lowercase()] = (inOwn + ids.filter { it in searchedIds }).size
+                    }
+                },
         )
     }
 
@@ -1790,8 +1811,9 @@ private fun buildLiveTvCategoryFilterOptions(
     favoritesLabel: String,
     uncategorizedLabel: String,
 ): List<LiveTvCategoryFilterOption> {
-    val categories = channels
-        .mapNotNull { channel -> channel.group?.trim()?.takeIf(String::isNotBlank) }
+    val categories = (channels
+        .mapNotNull { channel -> channel.group?.trim()?.takeIf(String::isNotBlank) } +
+        com.nuvio.app.totaleclipse.TotalEclipseLiveLayout.customMembers.keys) // Total Eclipse: your categories
         .distinctBy { it.lowercase() }
         .filterNot { category ->
             category.equals(allChannelsLabel, ignoreCase = true) ||
@@ -1827,6 +1849,11 @@ private fun filterLiveTvChannels(
     val nowMillis = kotlin.time.Clock.System.now().toEpochMilliseconds()
     val searchRank = HashMap<String, Int>()
     val recentOrder = recentChannelIds.withIndex().associate { (index, id) -> id to index }
+    // Total Eclipse: one of your categories lists its channels (moved or added) in your order.
+    val customOrder = if (filterMode == LiveTvChannelFilterMode.Category) {
+        com.nuvio.app.totaleclipse.TotalEclipseLiveLayout.membersOf(selectedCategoryName)
+            ?.withIndex()?.associate { (index, id) -> id to index }
+    } else null
     val filtered = channels
         .asSequence()
         .filter { channel ->
@@ -1835,7 +1862,8 @@ private fun filterLiveTvChannels(
                 LiveTvChannelFilterMode.Recents -> channel.id in recentOrder
                 LiveTvChannelFilterMode.Favorites -> channel.id in favoriteChannelIds
                 LiveTvChannelFilterMode.Category -> selectedCategoryName == null ||
-                    categoryNameForChannel(channel, uncategorizedGroupName).equals(selectedCategoryName, ignoreCase = true)
+                    categoryNameForChannel(channel, uncategorizedGroupName).equals(selectedCategoryName, ignoreCase = true) ||
+                    customOrder?.containsKey(channel.id) == true
             }
         }
         .filter { channel ->
@@ -1851,6 +1879,10 @@ private fun filterLiveTvChannels(
         }
     return if (filterMode == LiveTvChannelFilterMode.Recents) {
         filtered.sortedBy { recentOrder[it.id] ?: Int.MAX_VALUE }.toList()
+    } else if (customOrder != null && needle.isEmpty()) {
+        filtered.sortedWith(
+            compareBy<LiveTvChannel> { customOrder[it.id] ?: Int.MAX_VALUE }.thenBy(String.CASE_INSENSITIVE_ORDER) { it.name },
+        ).toList()
     } else {
         filtered.sortedWith(
             compareBy<LiveTvChannel> { searchRank[it.id] ?: 0 }
