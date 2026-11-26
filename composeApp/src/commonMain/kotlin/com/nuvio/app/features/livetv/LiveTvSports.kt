@@ -83,19 +83,17 @@ data class LiveTvSportsLeague(
     val id: String,
     val label: String,
     val path: String,
+    /** Total Eclipse: extra scoreboard query ("groups=50"), or empty. */
+    val query: String = "",
 )
 
+// Total Eclipse: Rob's leagues (2026-11-26): the US big four, college football and basketball,
+// and UFC. College feeds ask for every FBS / Division I game, not only ESPN's featured ones.
 internal val liveTvSportsLeagues = listOf(
-    LiveTvSportsLeague("eng.1", "Premier League", "soccer/eng.1"),
-    LiveTvSportsLeague("esp.1", "LaLiga", "soccer/esp.1"),
-    LiveTvSportsLeague("ita.1", "Serie A", "soccer/ita.1"),
-    LiveTvSportsLeague("ger.1", "Bundesliga", "soccer/ger.1"),
-    LiveTvSportsLeague("fra.1", "Ligue 1", "soccer/fra.1"),
-    LiveTvSportsLeague("uefa.champions", "Champions League", "soccer/uefa.champions"),
-    LiveTvSportsLeague("uefa.europa", "Europa League", "soccer/uefa.europa"),
-    LiveTvSportsLeague("idn.1", "Liga 1 Indonesia", "soccer/idn.1"),
-    LiveTvSportsLeague("nba", "NBA", "basketball/nba"),
     LiveTvSportsLeague("nfl", "NFL", "football/nfl"),
+    LiveTvSportsLeague("college-football", "College Football", "football/college-football", "groups=80"),
+    LiveTvSportsLeague("nba", "NBA", "basketball/nba"),
+    LiveTvSportsLeague("mens-college-basketball", "College Basketball", "basketball/mens-college-basketball", "groups=50"),
     LiveTvSportsLeague("nhl", "NHL", "hockey/nhl"),
     LiveTvSportsLeague("mlb", "MLB", "baseball/mlb"),
     LiveTvSportsLeague("ufc", "UFC", "mma/ufc"),
@@ -227,19 +225,20 @@ object LiveTvSportsRepository {
             null
         }
 
-        attempt("$base?dates=${dates.range}&limit=1000")?.takeIf { it.isNotEmpty() }?.let { return it }
+        val extra = if (league.query.isEmpty()) "" else "&${league.query}"
+        attempt("$base?dates=${dates.range}&limit=1000$extra")?.takeIf { it.isNotEmpty() }?.let { return it }
 
         val perDay = mutableListOf<LiveTvSportsEvent>()
         var anyDaySucceeded = false
         for (day in dates.days) {
-            attempt("$base?dates=$day")?.let { events ->
+            attempt("$base?dates=$day$extra")?.let { events ->
                 anyDaySucceeded = true
                 perDay += events
             }
         }
         if (perDay.isNotEmpty()) return perDay
 
-        attempt(base)?.let { return it }
+        attempt(if (league.query.isEmpty()) base else "$base?${league.query}")?.let { return it }
         if (anyDaySucceeded) return emptyList()
         throw lastError ?: IllegalStateException("No scoreboard response")
     }
