@@ -432,6 +432,20 @@ internal object HouseholdSync {
             "nuvio.tv.settings.playback.autoSkipMovieCredits" to com.nuvio.app.features.player.skip.AutoSkipSegmentType.MOVIE_CREDITS,
         )
         tv["nuvio.tv.settings.playback.showSpeed"]?.let { TotalEclipsePlayerPrefs.setHidesSpeed(slot, !it) }
+        // Total Eclipse: as on the TVs, open on the last profile instead of asking every launch
+        // (their default is on), and reuse the last working link when the TVs do.
+        val rememberLast = tv["nuvio.tv.settings.profile.autoSelectLast"] ?: true
+        if (changedSinceLastApply("profile.rememberLast", rememberLast.toString())) {
+            com.nuvio.app.features.profiles.ProfileRepository.setRememberLastProfileEnabled(rememberLast)
+            markApplied("profile.rememberLast", rememberLast.toString())
+        }
+        tv["nuvio.tv.settings.playback.reuseLastLink"]?.let { reuse ->
+            if (changedSinceLastApply("player.reuseLastLink.$slot", reuse.toString())) {
+                com.nuvio.app.features.player.PlayerSettingsRepository.ensureLoaded()
+                com.nuvio.app.features.player.PlayerSettingsRepository.setStreamReuseLastLinkEnabled(reuse)
+                markApplied("player.reuseLastLink.$slot", reuse.toString())
+            }
+        }
         val wanted = buildMap {
             skip.keys.forEach { key -> tv[key]?.let { put(key, it) } }
             tv["nuvio.tv.settings.playback.autoPlayNext"]?.let { put("autoPlayNext", it) }

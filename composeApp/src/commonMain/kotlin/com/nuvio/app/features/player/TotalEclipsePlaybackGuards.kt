@@ -86,6 +86,21 @@ internal fun PlayerScreenRuntime.BindTotalEclipsePlaybackGuards() {
         }
     }
 
+    // Total Eclipse (Rob, 2026-11-25): when an episode ends and nothing plays next by itself, the
+    // player closes after a few seconds and you're back on the show page, which now leads with
+    // the next episode (the Apple TVs land on it the same way). Films keep their own card.
+    LaunchedEffect(activePlaybackKey, playbackSnapshot.isEnded) {
+        if (!playbackSnapshot.isEnded || isLiveTvPlayback || isMoviePlayback) return@LaunchedEffect
+        if (activeSeasonNumber == null || activeEpisodeNumber == null) return@LaunchedEffect
+        delay(END_RETURN_DELAY_MS)
+        val busy = nextEpisodeAutoPlayAutomatic || showUserRatingSheet || totalEclipseRatingDue ||
+            showEpisodesPanel || showSourcesPanel || errorMessage != null || isPartyControlLocked
+        if (!playbackSnapshot.isEnded || busy) return@LaunchedEffect
+        InAppLogger.info(TAG, "episode ended; back to the show page")
+        flushWatchProgress()
+        args.onBack()
+    }
+
     // A rating, once per title, when the credits of a movie or a season's last episode start.
     val ratingOn by com.nuvio.app.totaleclipse.TotalEclipsePlayerPrefs.ratingPrompt.collectAsState()
     LaunchedEffect(activePlaybackKey, ratingOn, isLiveTvPlayback) {
@@ -118,6 +133,8 @@ internal fun PlayerScreenRuntime.BindTotalEclipsePlaybackGuards() {
         showUserRatingSheet = false
     }
 }
+
+private const val END_RETURN_DELAY_MS = 5_000L
 
 /** Titles (and seasons) already offered a rating since the app started. */
 private val ratingOffered = mutableSetOf<String>()
