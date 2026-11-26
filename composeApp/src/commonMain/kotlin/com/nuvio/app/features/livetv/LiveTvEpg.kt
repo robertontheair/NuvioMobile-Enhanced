@@ -109,6 +109,25 @@ internal fun parseXmltvGuide(
         val subtitle = readXmlElementTexts(body, "sub-title", limit = 1).firstOrNull()
         val rating = body.indexOf("<rating").takeIf { it >= 0 }
             ?.let { readXmlElementTexts(body.substring(it), "value", limit = 1).firstOrNull() }
+        val flags = TotalEclipseProgrammeKind.classify(
+            categories = categories,
+            premiere = "<premiere" in body,
+            previouslyShown = "<previously-shown" in body,
+            rating = rating,
+            episodeNum = episodeNum,
+            subtitle = subtitle,
+            descriptionHead = description,
+            title = title,
+            minutes = stopMillis?.let { (it - startMillis) / 60_000.0 },
+        )
+        // Total Eclipse: "S2 E5 · Episode title · TV-14", as the Apple TVs show it.
+        val facts = TotalEclipseProgrammeKind.facts(
+            episodeNum = episodeNum,
+            subtitle = subtitle,
+            descriptionHead = description,
+            rating = rating,
+            date = if (flags and TotalEclipseProgrammeKind.MOVIE != 0) readXmlElementTexts(body, "date", limit = 1).firstOrNull() else null,
+        )
         programs.getOrPut(liveTvEpgKey(channel)) { mutableListOf() } += LiveTvEpgProgram(
             title = title,
             startMillis = startMillis,
@@ -116,17 +135,11 @@ internal fun parseXmltvGuide(
             description = description,
             category = categories.firstOrNull(),
             // Total Eclipse: programme kind for the "On Now" filters, with the Apple TVs' rules.
-            flags = TotalEclipseProgrammeKind.classify(
-                categories = categories,
-                premiere = "<premiere" in body,
-                previouslyShown = "<previously-shown" in body,
-                rating = rating,
-                episodeNum = episodeNum,
-                subtitle = subtitle,
-                descriptionHead = description,
-                title = title,
-                minutes = stopMillis?.let { (it - startMillis) / 60_000.0 },
-            ),
+            flags = flags,
+            episode = facts.episode,
+            episodeTitle = facts.title,
+            rating = facts.rating,
+            year = facts.year,
         )
     }
 

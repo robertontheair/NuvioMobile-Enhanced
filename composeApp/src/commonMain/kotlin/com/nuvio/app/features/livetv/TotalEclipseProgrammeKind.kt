@@ -83,6 +83,72 @@ internal object TotalEclipseProgrammeKind {
     }
 
     private fun Char.isAsciiDigit() = this in '0'..'9'
+
+    data class Facts(val episode: String?, val title: String?, val rating: String?, val year: Int?)
+
+    /** The episode, its title, the rating and a film's year (HomeTV HomeTVProgrammeInfo.make). */
+    fun facts(episodeNum: String?, subtitle: String?, descriptionHead: String?, rating: String?, date: String?): Facts {
+        var episode = episodeNum?.let(::normalizedEpisode)
+        var title = subtitle?.trim()
+        // Some channels put "S02 E03 Episode title" at the start of the description.
+        if (episode == null && descriptionHead != null) {
+            episodeFromDescription(descriptionHead)?.let { (e, t) ->
+                episode = e
+                if (title.isNullOrEmpty()) title = t
+            }
+        }
+        // A long list of names is a guest list, not an episode title.
+        val episodeTitle = title?.takeIf { it.isNotEmpty() && it.length <= 80 && it.count { c -> c == ';' } < 2 }
+        val year = date?.takeIf { it.length >= 4 }?.take(4)?.toIntOrNull()?.takeIf { it > 1900 }
+        return Facts(episode, episodeTitle, rating?.let(::normalizedRating), year)
+    }
+
+    /** "S2E5" / "S02 E05" → "S2 E5"; "E148" stays; anything else (xmltv_ns "1.4.0/1") → null. */
+    fun normalizedEpisode(raw: String): String? {
+        val r = raw.trim().uppercase()
+        var i = 0
+        if (r.startsWith("S")) {
+            i = 1
+            val season = digits(r, i) ?: return null
+            i += season.second
+            while (i < r.length && r[i].isWhitespace()) i++
+            if (i >= r.length || r[i] != 'E') return null
+            i++
+            val episode = digits(r, i) ?: return null
+            if (i + episode.second != r.length) return null
+            return "S${season.first} E${episode.first}"
+        }
+        if (!r.startsWith("E")) return null
+        val episode = digits(r, 1) ?: return null
+        if (1 + episode.second != r.length) return null
+        return "E${episode.first}"
+    }
+
+    /** "S02 E03 Title…" at the very start of a description. */
+    fun episodeFromDescription(head: String): Pair<String, String?>? {
+        if (head.length < 2 || head[0] != 'S' || !head[1].isAsciiDigit()) return null
+        var i = 1
+        val season = digits(head, i) ?: return null
+        i += season.second
+        while (i < head.length && head[i].isWhitespace()) i++
+        if (i >= head.length || head[i] != 'E') return null
+        i++
+        val episode = digits(head, i) ?: return null
+        i += episode.second
+        while (i < head.length && (head[i] == ' ' || head[i] == '\t')) i++
+        var end = i
+        while (end < head.length && head[end] != '\n' && head[end] != '\r') end++
+        val title = head.substring(i, end).trim()
+        return "S${season.first} E${episode.first}" to title.ifEmpty { null }
+    }
+
+    /** ASCII digits from [start] (at least one), as a number without leading zeros, and how many. */
+    private fun digits(s: String, start: Int): Pair<String, Int>? {
+        var end = start
+        while (end < s.length && s[end].isAsciiDigit()) end++
+        if (end == start) return null
+        return s.substring(start, end).trimStart('0').ifEmpty { "0" } to (end - start)
+    }
 }
 
 /** Total Eclipse: the guide's "On Now" filters, as on the Apple TVs. */

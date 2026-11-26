@@ -62,6 +62,10 @@ private data class CompactEpgProgram(
     @kotlinx.serialization.SerialName("d") val description: Int = -1,
     @kotlinx.serialization.SerialName("c") val category: Int = -1,
     @kotlinx.serialization.SerialName("f") val flags: Int = 0,
+    @kotlinx.serialization.SerialName("n") val episode: Int = -1,
+    @kotlinx.serialization.SerialName("u") val episodeTitle: Int = -1,
+    @kotlinx.serialization.SerialName("r") val rating: Int = -1,
+    @kotlinx.serialization.SerialName("y") val year: Int = 0,
 )
 
 @Serializable
@@ -163,6 +167,10 @@ internal object LiveTvCacheStore {
                         description = text(program.description),
                         category = text(program.category),
                         flags = program.flags,
+                        episode = text(program.episode),
+                        episodeTitle = text(program.episodeTitle),
+                        rating = text(program.rating),
+                        year = program.year.takeIf { it > 0 },
                     )
                 }
             },
@@ -207,6 +215,10 @@ internal object LiveTvCacheStore {
                         description = ref(program.description),
                         category = ref(program.category),
                         flags = program.flags,
+                        episode = ref(program.episode),
+                        episodeTitle = ref(program.episodeTitle),
+                        rating = ref(program.rating),
+                        year = program.year ?: 0,
                     )
                 }
             }
@@ -226,7 +238,7 @@ internal object LiveTvCacheStore {
  * Bumped when the channel list is read differently, so lists saved by an older version are
  * loaded again (3: VLC's user agent by default, Xtream panel links in the account's format).
  */
-private const val ChannelsCacheFormat = 5 // Total Eclipse: 4 = the TVs' portable channel keys; 5 = programme kinds
+private const val ChannelsCacheFormat = 6 // Total Eclipse: 4 = the TVs' portable channel keys; 5 = programme kinds; 6 = episode facts
 
 internal fun liveTvChannelSourceSignature(state: LiveTvUiState): String = buildString {
     append("v").append(ChannelsCacheFormat).append(';')

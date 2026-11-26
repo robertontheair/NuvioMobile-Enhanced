@@ -159,7 +159,7 @@ internal fun LiveTvEpgNowNext(
                     maxLines = 1,
                 )
                 Text(
-                    text = current.displayTitle,
+                    text = current.episode?.let { "${current.displayTitle} · $it" } ?: current.displayTitle,
                     style = MaterialTheme.typography.bodySmall,
                     color = tokens.colors.textSecondary,
                     fontWeight = FontWeight.Medium,
@@ -438,6 +438,7 @@ private fun LiveTvEpgProgramRow(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
+            LiveTvProgrammeFacts(program, color = tokens.colors.textSecondary)
             if (isLive) {
                 val minutesLeft = ((program.endMillis - nowMillis) / 60_000L).coerceAtLeast(1L).toInt()
                 LiveTvEpgProgressBar(

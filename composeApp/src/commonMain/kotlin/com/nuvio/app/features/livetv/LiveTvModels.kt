@@ -22,6 +22,11 @@ data class LiveTvEpgProgram(
     val category: String? = null,
     /** Total Eclipse: TotalEclipseProgrammeKind flags (NEW, MOVIE, SPORTS, NEWS, KIDS). */
     val flags: Int = 0,
+    /** Total Eclipse: "S2 E5" / "E148", the episode's title, "TV-14", and a film's year. */
+    val episode: String? = null,
+    val episodeTitle: String? = null,
+    val rating: String? = null,
+    val year: Int? = null,
 ) {
     fun isAiringAt(timeMillis: Long): Boolean = timeMillis in startMillis until endMillis
 
