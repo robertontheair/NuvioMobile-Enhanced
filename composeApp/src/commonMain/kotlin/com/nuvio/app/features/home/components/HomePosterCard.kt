@@ -37,6 +37,7 @@ fun HomePosterCard(
         bottomLeftLogoUrl = if (isLandscapeMode && showLandscapeOverlay && effectiveLandscapePoster.isNullOrBlank()) item.logo else null,
         bottomLeftText = if (isLandscapeMode && showLandscapeOverlay && effectiveLandscapePoster.isNullOrBlank() && item.logo.isNullOrBlank() && !posterCardStyle.hideLabelsEnabled) item.name else null,
         isWatched = isWatched,
+        episodesLeft = com.nuvio.app.totaleclipse.rememberTotalEclipseEpisodesLeft(item),
         onClick = onClick,
         onLongClick = onLongClick,
     )

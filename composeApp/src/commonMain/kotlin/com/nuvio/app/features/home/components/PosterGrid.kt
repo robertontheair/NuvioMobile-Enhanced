@@ -180,7 +180,7 @@ private fun PosterGridTile(
                     contentScale = ContentScale.Crop,
                 )
             }
-            NuvioPosterWatchedOverlay(isWatched = isWatched)
+            NuvioPosterWatchedOverlay(isWatched = isWatched, episodesLeft = com.nuvio.app.totaleclipse.rememberTotalEclipseEpisodesLeft(item))
         }
         if (!hideLabels) {
             Text(
