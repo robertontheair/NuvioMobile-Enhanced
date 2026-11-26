@@ -93,8 +93,9 @@ internal fun PlayerScreenRuntime.BindTotalEclipsePlaybackGuards() {
         if (!playbackSnapshot.isEnded || isLiveTvPlayback || isMoviePlayback) return@LaunchedEffect
         if (activeSeasonNumber == null || activeEpisodeNumber == null) return@LaunchedEffect
         delay(END_RETURN_DELAY_MS)
-        val busy = nextEpisodeAutoPlayAutomatic || showUserRatingSheet || totalEclipseRatingDue ||
-            showEpisodesPanel || showSourcesPanel || errorMessage != null || isPartyControlLocked
+        // A rating prompt or an open panel is waited out, not a reason to stay for good.
+        while (showUserRatingSheet || totalEclipseRatingDue || showEpisodesPanel || showSourcesPanel) delay(1_000)
+        val busy = nextEpisodeAutoPlayAutomatic || errorMessage != null || isPartyControlLocked
         if (!playbackSnapshot.isEnded || busy) return@LaunchedEffect
         InAppLogger.info(TAG, "episode ended; back to the show page")
         flushWatchProgress()
@@ -102,13 +103,20 @@ internal fun PlayerScreenRuntime.BindTotalEclipsePlaybackGuards() {
     }
 
     // Total Eclipse: a film in a collection lands on the next film's page, as on the Apple TVs.
-    LaunchedEffect(activePlaybackKey, playbackSnapshot.isEnded) {
-        if (!playbackSnapshot.isEnded || isLiveTvPlayback || !isMoviePlayback) return@LaunchedEffect
+    // Waits out a rating prompt or the sources panel instead of giving up, checks again once
+    // the film's details (with its collection) have loaded, and counts the end over a few
+    // seconds, as the player's "ended" can flicker on the stream's last frame.
+    LaunchedEffect(activePlaybackKey, playerMeta?.collectionItems?.size) {
+        if (isLiveTvPlayback || !isMoviePlayback) return@LaunchedEffect
         val next = com.nuvio.app.totaleclipse.TotalEclipseNextFilm.after(playerMeta) ?: return@LaunchedEffect
-        delay(FILM_END_DELAY_MS)
-        val busy = showUserRatingSheet || totalEclipseRatingDue || showSourcesPanel ||
-            errorMessage != null || isPartyControlLocked
-        if (!playbackSnapshot.isEnded || busy) return@LaunchedEffect
+        var endedSeconds = 0
+        while (true) {
+            delay(1_000)
+            endedSeconds = if (playbackSnapshot.isEnded) endedSeconds + 1 else 0
+            val busy = showUserRatingSheet || totalEclipseRatingDue || showSourcesPanel
+            if (endedSeconds >= FILM_END_DELAY_MS / 1_000 && !busy) break
+        }
+        if (errorMessage != null || isPartyControlLocked) return@LaunchedEffect
         InAppLogger.info(TAG, "film ended; on to the next in its collection")
         flushWatchProgress()
         args.onBack()

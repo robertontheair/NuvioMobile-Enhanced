@@ -90,6 +90,8 @@ final class OrientationLockCoordinator {
 
     func start() {
         guard observers.isEmpty else { return }
+        // Total Eclipse: so the player's exit knows how the phone is held.
+        UIDevice.current.beginGeneratingDeviceOrientationNotifications()
 
         let center = NotificationCenter.default
         observers.append(
@@ -146,7 +148,14 @@ final class OrientationLockCoordinator {
 
     private func requestOrientationUpdate(for mask: UIInterfaceOrientationMask, forceRotate: Bool) {
         if #available(iOS 16.0, *) {
-            let preferences = UIWindowScene.GeometryPreferences.iOS(interfaceOrientations: mask)
+            // Total Eclipse: leaving the player while the phone is held upright turns the app
+            // upright again at once; "any orientation" alone waited for the phone to move and
+            // left the app sideways. Turning later still rotates, as the mask allows it.
+            let device = UIDevice.current.orientation
+            let backUpright = !forceRotate && !device.isLandscape &&
+                UIDevice.current.userInterfaceIdiom == .phone
+            let requested: UIInterfaceOrientationMask = backUpright ? .portrait : mask
+            let preferences = UIWindowScene.GeometryPreferences.iOS(interfaceOrientations: requested)
             UIApplication.shared.connectedScenes
                 .compactMap { $0 as? UIWindowScene }
                 .filter { $0.session.role == .windowApplication }
