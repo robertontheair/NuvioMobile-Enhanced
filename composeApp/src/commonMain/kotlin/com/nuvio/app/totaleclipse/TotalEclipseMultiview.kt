@@ -119,6 +119,8 @@ internal object TotalEclipseMultiview {
 internal expect fun TotalEclipseMultiviewPane(
     channel: LiveTvChannel,
     muted: Boolean,
+    slot: Int,
+    count: Int,
     modifier: Modifier,
 )
 
@@ -219,7 +221,13 @@ private fun MultiviewGrid(
         ) {
             // Each pane keyed by channel, so removing one doesn't restart the others.
             androidx.compose.runtime.key(channel.id) {
-                TotalEclipseMultiviewPane(channel = channel, muted = index != sound, modifier = Modifier.fillMaxSize())
+                TotalEclipseMultiviewPane(
+                    channel = channel,
+                    muted = index != sound,
+                    slot = index,
+                    count = channels.size,
+                    modifier = Modifier.fillMaxSize(),
+                )
             }
             Box(modifier = Modifier.fillMaxSize().clickable { onPaneTap(index) })
             AnimatedVisibility(

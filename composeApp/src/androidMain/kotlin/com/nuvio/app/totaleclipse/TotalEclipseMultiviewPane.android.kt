@@ -12,6 +12,8 @@ import com.nuvio.app.features.livetv.LiveTvChannel
 internal actual fun TotalEclipseMultiviewPane(
     channel: LiveTvChannel,
     muted: Boolean,
+    slot: Int,
+    count: Int,
     modifier: Modifier,
 ) {
     Box(modifier.background(Color.Black))

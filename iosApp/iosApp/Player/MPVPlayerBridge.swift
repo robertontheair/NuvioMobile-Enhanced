@@ -160,6 +160,8 @@ final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
     /// Total Eclipse: a Multiview pane plays alongside the others (embedded, so starting one
     /// doesn't stop the rest) but with sound, so the audio session must be on.
     func setMultiviewPane(enabled: Bool) { ensurePlayerViewController().setMultiviewPane(enabled) }
+    /// Total Eclipse: this pane's place in Multiview, for the connected TV's grid.
+    func setMultiviewSlot(index: Int32, count: Int32) { ensurePlayerViewController().setMultiviewSlot(Int(index), count: Int(count)) }
     func setResizeMode(mode: Int32) { playerVC?.setResize(Int(mode)) }
     func syncVideoSurfaceLayout(width: Double, height: Double) {
         playerVC?.syncVideoSurfaceLayout(size: CGSize(width: width, height: height))
@@ -857,7 +859,9 @@ final class MPVPlayerViewController: UIViewController {
         guard !isPlayerDestroyed else { return }
         let parking = PlayerPictureInPictureParking.shared
         let parkedInWindow = parking.isParked(player: self) && !parking.isBrowsing(player: self)
-        let stage = isEmbeddedPreviewMode || parkedInWindow
+        // Total Eclipse: Multiview panes go to the TV too, each in its place of the grid.
+        let stage = isMultiviewPane ? TotalEclipseExternalDisplay.shared.claimMultiview(for: self)
+            : isEmbeddedPreviewMode || parkedInWindow
             ? nil : TotalEclipseExternalDisplay.shared.claim(for: self)
         CATransaction.begin()
         CATransaction.setDisableActions(true)
@@ -907,7 +911,10 @@ final class MPVPlayerViewController: UIViewController {
     private func layoutPlayerSurfaces() {
         placeVideoLayer()
         let deviceBounds = CGRect(origin: .zero, size: externallyManagedViewSize ?? view.bounds.size)
-        let bounds = externalStage.map { CGRect(origin: .zero, size: $0.bounds.size) } ?? deviceBounds
+        let paneFrame = isMultiviewPane && externalStage != nil
+            ? TotalEclipseExternalDisplay.shared.multiviewFrame(slot: multiviewSlot, count: multiviewCount) : nil
+        let bounds = paneFrame.map { CGRect(origin: .zero, size: $0.size) }
+            ?? externalStage.map { CGRect(origin: .zero, size: $0.bounds.size) } ?? deviceBounds
         guard bounds.width > 1, bounds.height > 1 else { return }
 
         let scale = renderScale()
@@ -919,7 +926,7 @@ final class MPVPlayerViewController: UIViewController {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         metalLayer.contentsScale = scale
-        metalLayer.position = .zero
+        metalLayer.position = paneFrame?.origin ?? .zero
         metalLayer.bounds = CGRect(origin: .zero, size: bounds.size)
         pictureInPictureController?.displayLayer.frame = deviceBounds
         remoteBackdrop?.frame = deviceBounds
@@ -1858,8 +1865,20 @@ final class MPVPlayerViewController: UIViewController {
     }
 
     func setMultiviewPane(_ enabled: Bool) {
+        isMultiviewPane = enabled
         setEmbeddedPreviewMode(enabled)
         if enabled { activateAudioSessionForPlayback() }
+    }
+
+    private var isMultiviewPane = false
+    private var multiviewSlot = 0
+    private var multiviewCount = 1
+
+    func setMultiviewSlot(_ index: Int, count: Int) {
+        guard index != multiviewSlot || count != multiviewCount else { return }
+        multiviewSlot = index
+        multiviewCount = count
+        if isViewLoaded { layoutPlayerSurfaces() }
     }
 
     func setMuted(_ muted: Bool) {

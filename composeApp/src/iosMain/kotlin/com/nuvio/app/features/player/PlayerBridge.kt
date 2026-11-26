@@ -64,6 +64,8 @@ interface NuvioPlayerBridge {
     fun setEmbeddedPreviewMode(enabled: Boolean)
     /** Total Eclipse: an embedded player with sound, for Multiview. */
     fun setMultiviewPane(enabled: Boolean)
+    /** Total Eclipse: the pane's place in Multiview, for the connected TV's grid. */
+    fun setMultiviewSlot(index: Int, count: Int)
     fun setResizeMode(mode: Int) // 0=Fit, 1=Fill, 2=Zoom
     fun syncVideoSurfaceLayout(width: Double, height: Double)
     fun getAudioTrackCount(): Int

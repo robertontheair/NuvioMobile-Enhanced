@@ -65,9 +65,40 @@ final class TotalEclipseExternalDisplay {
     }
 
     func release(_ player: MPVPlayerViewController) {
-        guard self.player === player || self.player == nil else { return }
+        multiviewPanes.remove(player)
+        guard self.player === player || self.player == nil else {
+            stage?.setPlaying(self.player != nil || multiviewPanes.count > 0)
+            return
+        }
         self.player = nil
-        stage?.setPlaying(false)
+        stage?.setPlaying(multiviewPanes.count > 0)
+    }
+
+    // MARK: Multiview on the TV
+
+    /// Total Eclipse: Multiview panes share the display, each in its own place of a grid.
+    private let multiviewPanes = NSHashTable<MPVPlayerViewController>.weakObjects()
+
+    func claimMultiview(for pane: MPVPlayerViewController) -> StageView? {
+        guard let stage else { return nil }
+        multiviewPanes.add(pane)
+        stage.setPlaying(true)
+        return stage
+    }
+
+    /// The place of pane [slot] of [count] on the display: one fills it, two side by side,
+    /// three or four in a 2×2 grid (the same layout as on the iPad).
+    func multiviewFrame(slot: Int, count: Int) -> CGRect {
+        guard let bounds = stage?.bounds, bounds.width > 1 else { return .zero }
+        let gap: CGFloat = 4
+        let w = bounds.width, h = bounds.height
+        let rect: CGRect
+        switch count {
+        case ...1: rect = bounds
+        case 2: rect = CGRect(x: CGFloat(slot) * w / 2, y: 0, width: w / 2, height: h)
+        default: rect = CGRect(x: CGFloat(slot % 2) * w / 2, y: CGFloat(slot / 2) * h / 2, width: w / 2, height: h / 2)
+        }
+        return count <= 1 ? rect : rect.insetBy(dx: gap / 2, dy: gap / 2)
     }
 
     private func log(_ message: String) {

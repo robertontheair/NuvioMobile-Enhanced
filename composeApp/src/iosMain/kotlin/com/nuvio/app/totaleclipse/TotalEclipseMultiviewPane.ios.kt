@@ -39,6 +39,8 @@ private const val TAG = "TotalEclipse/Multiview"
 internal actual fun TotalEclipseMultiviewPane(
     channel: LiveTvChannel,
     muted: Boolean,
+    slot: Int,
+    count: Int,
     modifier: Modifier,
 ) {
     val bridge = remember(channel.id) { NuvioPlayerBridgeFactory.create() }
@@ -74,6 +76,8 @@ internal actual fun TotalEclipseMultiviewPane(
     }
 
     LaunchedEffect(bridge, muted) { runCatching { bridge.setMuted(muted) } }
+    // Total Eclipse: on a connected TV, each pane takes its place of the grid there.
+    LaunchedEffect(bridge, slot, count) { runCatching { bridge.setMultiviewSlot(slot, count) } }
 
     DisposableEffect(bridge) {
         onDispose { runCatching { bridge.pause(); bridge.destroy() } }
