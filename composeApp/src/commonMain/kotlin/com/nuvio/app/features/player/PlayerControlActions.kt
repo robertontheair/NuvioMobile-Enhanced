@@ -23,6 +23,7 @@ import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.automirrored.rounded.Toc
 import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.Build
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Cast
 import androidx.compose.material.icons.rounded.CastConnected
 import androidx.compose.material.icons.rounded.Flag
@@ -96,6 +97,7 @@ internal fun PlayerToolbar(
     isPortraitPlayback: Boolean = false,
     onPictureInPictureClick: (() -> Unit)? = null,
     onDiscTitlesClick: (() -> Unit)? = null,
+    onCustomizeToolbarClick: (() -> Unit)? = null,
 ) {
     Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Spacer(Modifier.weight(1f))
@@ -143,6 +145,15 @@ internal fun PlayerToolbar(
                     icon = if (isCasting) Icons.Rounded.CastConnected else Icons.Rounded.Cast,
                     onClick = it,
                 )
+            }
+            onCustomizeToolbarClick?.let { customize ->
+                if (!isLocked) {
+                    PlayerAction(
+                        description = stringResource(Res.string.settings_playback_toolbar_layout),
+                        icon = Icons.Rounded.Tune,
+                        onClick = customize,
+                    )
+                }
             }
             PlayerAction(
                 description = stringResource(
@@ -348,43 +359,52 @@ internal fun PlayerControlActions(
     val playerSettings by PlayerSettingsRepository.uiState.collectAsState()
     val toolbarLayout = playerSettings.toolbarLayout
     val primaryActions = toolbarLayout.visibleButtons.mapNotNull(availableActions::get)
-    val secondaryActions = toolbarLayout.hiddenButtons.mapNotNull(availableActions::get)
-    // Total Eclipse (Rob, 2026-11-25): the strip is always expanded, every button showing; it
-    // scrolls sideways when they don't fit. No chevron to fold it away.
-    val hasOverflow = false
-    val expanded = true
+    val overflowActions = toolbarLayout.overflowButtons.mapNotNull(availableActions::get)
+    // Total Eclipse (Rob, 2026-11-25): the strip is always expanded, the overflow buttons
+    // showing too; it scrolls sideways when they don't fit. No chevron to fold it away.
     val scrollState = rememberScrollState()
+    val boxAlignment = when (toolbarLayout.alignment) {
+        PlayerControlBarAlignment.LEFT -> Alignment.CenterStart
+        PlayerControlBarAlignment.CENTER -> Alignment.Center
+        PlayerControlBarAlignment.RIGHT -> Alignment.CenterEnd
+    }
+    val shownActions = primaryActions + overflowActions
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = PlayerTimelineContentInset),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(modifier = Modifier.weight(1f)) {
-                Row(
-                    modifier = Modifier
-                        .playerLiquidGlass(
-                            shape = PlayerGlassCapsule,
-                            refractionHeight = 8.dp,
-                            refractionAmount = 12.dp,
-                        )
-                        .horizontalScroll(scrollState),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    (if (expanded) primaryActions + secondaryActions else primaryActions).forEach { action ->
-                        Box {
-                            PlayerAction(
-                                description = action.description,
-                                onClick = {
-                                    onInteraction()
-                                    action.onClick()
-                                },
-                                icon = action.icon,
-                                painter = action.painter,
-                                iconSize = action.iconSize,
-                                tint = action.tint,
+            Box(
+                modifier = Modifier.weight(1f),
+                contentAlignment = boxAlignment,
+            ) {
+                if (shownActions.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier
+                            .playerLiquidGlass(
+                                shape = PlayerGlassCapsule,
+                                refractionHeight = 8.dp,
+                                refractionAmount = 12.dp,
                             )
-                            action.popup?.invoke()
+                            .horizontalScroll(scrollState),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        shownActions.forEach { action ->
+                            Box {
+                                PlayerAction(
+                                    description = action.description,
+                                    onClick = {
+                                        onInteraction()
+                                        action.onClick()
+                                    },
+                                    icon = action.icon,
+                                    painter = action.painter,
+                                    iconSize = action.iconSize,
+                                    tint = action.tint,
+                                )
+                                action.popup?.invoke()
+                            }
                         }
                     }
                 }

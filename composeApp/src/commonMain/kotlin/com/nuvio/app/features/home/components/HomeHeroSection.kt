@@ -47,6 +47,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -106,9 +107,11 @@ import com.nuvio.app.core.ui.withVerticalBar
 import com.nuvio.app.features.home.stableKey
 import com.nuvio.app.navigation.LocalUseNativeNavigation
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.abs
@@ -263,7 +266,9 @@ internal fun HomeHeroSection(
 
         autoAdvances += 1
         val nextPage = pagerState.currentPage + 1
-        pagerState.animateScrollToPage(nextPage)
+        withContext(NonCancellable) {
+            pagerState.animateScrollToPage(nextPage)
+        }
     }
 
     val isCardStyle = heroStyle == HomeHeroStyle.CARD

@@ -562,6 +562,7 @@ private fun PlayerScreenRuntime.BindPlayerUiVisibilityEffects() {
         snapshotSignals.isLoading,
         showParentalGuide,
         showSpeedPanel,
+        showToolbarCustomizer,
         errorMessage,
     ) {
         if (
@@ -572,6 +573,7 @@ private fun PlayerScreenRuntime.BindPlayerUiVisibilityEffects() {
             playbackSnapshot.isLoading ||
             showParentalGuide ||
             showSpeedPanel ||
+            showToolbarCustomizer ||
             errorMessage != null
         ) {
             return@LaunchedEffect

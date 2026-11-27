@@ -306,7 +306,7 @@ struct PluginSubtitle {
 
 // MARK: - Track Info
 
-struct TrackInfo {
+struct TrackInfo: Equatable {
     let index: Int
     let id: Int
     let type: String
@@ -2500,6 +2500,7 @@ final class MPVPlayerViewController: UIViewController {
 
             guard let tracks else { return }
             DispatchQueue.main.async {
+                guard tracks.audio != self.audioTracks || tracks.subtitles != self.subtitleTracks else { return }
                 self.audioTracks = tracks.audio
                 self.tracksGeneration &+= 1
                 self.subtitleTracks = tracks.subtitles
