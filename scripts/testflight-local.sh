@@ -93,8 +93,19 @@ PLIST
 
 echo "==> Export (${destination})"
 rm -rf "$out/export"
+# Total Eclipse: sign in with the App Store Connect API key when it's on this Mac, so the upload
+# doesn't depend on Xcode's Apple Account staying signed in. The key ID and issuer come from
+# ASC_KEY_ID / ASC_ISSUER_ID or ~/.appstoreconnect/testflight.env (kept off the repo).
+[[ -f "$HOME/.appstoreconnect/testflight.env" ]] && source "$HOME/.appstoreconnect/testflight.env"
+asc_key_id="${ASC_KEY_ID:-}"
+asc_issuer="${ASC_ISSUER_ID:-}"
+asc_key="$HOME/.appstoreconnect/private_keys/AuthKey_${asc_key_id}.p8"
+auth=()
+if [[ -n "$asc_key_id" && -n "$asc_issuer" && -f "$asc_key" ]]; then
+    auth=(-authenticationKeyPath "$asc_key" -authenticationKeyID "$asc_key_id" -authenticationKeyIssuerID "$asc_issuer")
+fi
 xcodebuild -exportArchive -archivePath "$archive" -exportOptionsPlist "$out/ExportOptions.plist" \
-    -exportPath "$out/export" -allowProvisioningUpdates \
+    -exportPath "$out/export" -allowProvisioningUpdates "${auth[@]}" \
     > "$out/export.log" 2>&1 || { tail -40 "$out/export.log"; exit 1; }
 
 if $upload; then
